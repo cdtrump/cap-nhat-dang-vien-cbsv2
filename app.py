@@ -237,12 +237,28 @@ if app_mode == "👤 Cập nhật thông tin":
                 if col in TEMP_COLS:
                     continue
                 
+                # ============================================================
+                # CHÈN TIÊU ĐỀ PHÂN VÙNG (SECTION HEADERS) - MỚI THÊM
+                # ============================================================
+                if col == 'Nơi đăng ký khai sinh - Quốc gia *':
+                    st.markdown("---") 
+                    st.subheader("1. THÔNG TIN KHAI SINH")
+                
+                elif col == 'Quê quán (theo mô hình 2 cấp) - Quốc gia *':
+                    st.markdown("---")
+                    st.subheader("2. THÔNG TIN QUÊ QUÁN")
+                
+                elif col == 'Thường trú (theo mô hình 2 cấp) - Quốc gia *':
+                    st.markdown("---")
+                    st.subheader("3. THÔNG TIN THƯỜNG TRÚ")
+                # ============================================================
+                
                 val = current_data.get(col, "")
                 
                 # --- XỬ LÝ ĐẶC BIỆT 1: NƠI ĐĂNG KÝ KHAI SINH ---
                 if col == 'Nơi đăng ký khai sinh - Địa chỉ chi tiết *':
-                    st.markdown("---")
-                    st.markdown("##### 📍 Nơi đăng ký khai sinh - Chi tiết")
+                    # st.markdown("---") # Bỏ dòng này vì đã có header ở trên
+                    # st.markdown("##### 📍 Nơi đăng ký khai sinh - Chi tiết") # Bỏ dòng này cho đỡ lặp
                     
                     # Lấy dữ liệu cũ từ cột Temp (nếu có), nếu chưa có thì lấy cột chính
                     val_xa = current_data.get('Temp_XaPhuong_KhaiSinh', '')
@@ -273,12 +289,12 @@ if app_mode == "👤 Cập nhật thông tin":
                     updated_values[col] = final_address
                     updated_values['Temp_XaPhuong_KhaiSinh'] = input_xa
                     updated_values['Temp_ThonTo_KhaiSinh'] = input_thon
-                    st.markdown("---")
+                    # st.markdown("---") # Bỏ dòng này
 
                 # --- XỬ LÝ ĐẶC BIỆT 2: THƯỜNG TRÚ ---
                 elif col == 'Thường trú (theo mô hình 2 cấp) - Địa chỉ chi tiết *':
-                    st.markdown("---")
-                    st.markdown("##### 🏠 Thường trú - Chi tiết")
+                    # st.markdown("---") # Bỏ dòng này vì đã có header
+                    # st.markdown("##### 🏠 Thường trú - Chi tiết") # Bỏ dòng này cho đỡ lặp
                     
                     val_xa_tt = current_data.get('Temp_XaPhuong_ThuongTru', '')
                     val_thon_tt = current_data.get('Temp_ThonTo_ThuongTru', '')
@@ -303,7 +319,7 @@ if app_mode == "👤 Cập nhật thông tin":
                     updated_values[col] = final_address_tt
                     updated_values['Temp_XaPhuong_ThuongTru'] = input_xa_tt
                     updated_values['Temp_ThonTo_ThuongTru'] = input_thon_tt
-                    st.markdown("---")
+                    # st.markdown("---") # Bỏ dòng này
 
                 # --- XỬ LÝ ĐẶC BIỆT 3: QUÊ QUÁN (CHỈ SỬA HIỂN THỊ) ---
                 elif col == 'Quê quán (theo mô hình 2 cấp) - Địa chỉ chi tiết *':
@@ -326,7 +342,7 @@ if app_mode == "👤 Cập nhật thông tin":
                         st.text_input(display_label, value=val, disabled=True)
                         updated_values[col] = str(val)
                     elif col == 'Trạng thái hoạt động':
-                        opts = ["Đang sinh hoạt Đảng", "Đã chuyển sinh hoạt"]
+                        opts = ["Đang sinh hoạt Đảng", "Đã chuyển sinh hoạt", "Đã từ trần", "Đã ra khỏi Đảng"]
                         idx_opt = opts.index(val) if val in opts else 0
                         updated_values[col] = st.selectbox(display_label, opts, index=idx_opt)
                     elif col == 'Giới tính *':
@@ -366,7 +382,7 @@ if app_mode == "👤 Cập nhật thông tin":
                 if missing_fields:
                     st.error("⚠️ KHÔNG THỂ LƯU! Bạn chưa điền các thông tin bắt buộc sau:", icon="🚫")
                     for field in missing_fields:
-                        st.markdown(f"- {field}")
+                        st.markdown(f"- **{field}**")
                 else:
                     with st.spinner("Đang lưu dữ liệu..."):
                         try:
@@ -517,6 +533,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
