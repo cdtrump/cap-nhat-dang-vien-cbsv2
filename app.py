@@ -314,17 +314,41 @@ elif app_mode == "📊 Admin Dashboard":
 
             # --- PHẦN 1: DANH SÁCH CHƯA CẬP NHẬT ---
             st.subheader(f"📋 Danh sách {not_updated_count} người CHƯA cập nhật")
+            
+            # Lọc ra những người chưa cập nhật
             not_updated_df = df_main[~df_main['ID'].isin(updated_ids)].copy()
+            
+            # Hiển thị trên web (Vẫn chỉ hiện ít cột cho gọn giao diện)
             display_cols = ['ID', 'Họ và tên *', 'Sinh ngày * (dd/mm/yyyy)', 'Tổ chức Đảng đang sinh hoạt * (không sửa)']
-            st.dataframe(not_updated_df[display_cols], use_container_width=True, hide_index=True)
-
-            csv = not_updated_df[display_cols].to_csv(index=False).encode('utf-8-sig')
-            st.download_button(
-                label="📥 Tải danh sách CHƯA cập nhật (CSV)",
-                data=csv,
-                file_name='danh_sach_chua_cap_nhat.csv',
-                mime='text/csv',
+            st.dataframe(
+                not_updated_df[display_cols],
+                use_container_width=True,
+                hide_index=True
             )
+
+            # --- XỬ LÝ XUẤT FILE EXCEL ĐẦY ĐỦ ---
+            # Tạo bộ nhớ đệm cho file Excel
+            buffer_missing = io.BytesIO()
+            
+            # Ghi toàn bộ dữ liệu (not_updated_df) ra Excel, không lọc cột
+            with pd.ExcelWriter(buffer_missing, engine='openpyxl') as writer:
+                not_updated_df.to_excel(writer, index=False, sheet_name='ChuaCapNhat')
+            
+            # Đưa con trỏ về đầu file
+            buffer_missing.seek(0)
+            
+            # Tên file kèm thời gian
+            file_name_missing = f"DS_ChuaCapNhat_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+
+            col_dl1, col_dl2 = st.columns([1, 2])
+            with col_dl1:
+                st.download_button(
+                    label="📥 Tải danh sách đầy đủ (.xlsx)",
+                    data=buffer_missing,
+                    file_name=file_name_missing,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    type="primary"
+                )
 
             st.divider()
 
@@ -354,6 +378,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
