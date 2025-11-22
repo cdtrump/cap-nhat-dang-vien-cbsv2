@@ -140,7 +140,7 @@ if app_mode == "👤 Cập nhật thông tin":
 
     # --- BƯỚC 1: TÌM KIẾM ---
     if st.session_state.step == 1:
-        st.subheader("Bước 1: Tra cứu thông tin cá nhân")
+        st.subheader("Bước 1: Tra cứu thông tin")
         with st.form("search_form"):
             col_s1, col_s2 = st.columns(2)
             with col_s1:
@@ -420,6 +420,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
