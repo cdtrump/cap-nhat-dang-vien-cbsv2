@@ -242,15 +242,15 @@ if app_mode == "👤 Cập nhật thông tin":
                 # ============================================================
                 if col == 'Nơi đăng ký khai sinh - Quốc gia *':
                     st.markdown("---") 
-                    st.subheader("1. THÔNG TIN KHAI SINH")
+                    st.subheader("🏠 THÔNG TIN KHAI SINH")
                 
                 elif col == 'Quê quán (theo mô hình 2 cấp) - Quốc gia *':
                     st.markdown("---")
-                    st.subheader("2. THÔNG TIN QUÊ QUÁN")
+                    st.subheader("🏠 THÔNG TIN QUÊ QUÁN")
                 
                 elif col == 'Thường trú (theo mô hình 2 cấp) - Quốc gia *':
                     st.markdown("---")
-                    st.subheader("3. THÔNG TIN THƯỜNG TRÚ")
+                    st.subheader("🏠 THÔNG TIN THƯỜNG TRÚ")
                 # ============================================================
                 
                 val = current_data.get(col, "")
@@ -533,6 +533,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
