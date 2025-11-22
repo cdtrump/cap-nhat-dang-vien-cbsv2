@@ -210,10 +210,10 @@ if app_mode == "👤 Cập nhật thông tin":
                         col, 
                         value=str(val), 
                         label_visibility="collapsed", # Ẩn label mặc định để dùng markdown phía trên cho đẹp
-                        placeholder="Ví dụ: Thôn Hòa Bình Hạ, Xã Văn Giang, Tỉnh Hưng Yên"
+                        placeholder="Ví dụ: Thôn Hòa Bình Hạ, Xã Văn Giang"
                     )
                     # Dòng gợi ý màu xám bên dưới
-                    st.caption("💡 *Định dạng mẫu: Thôn/Xóm/Số nhà/Tổ, Xã/Phường*")
+                    st.caption("💡 *Định dạng mẫu: Số nhà/Tổ/Thôn, Xã/Phường*")
                 
                 # --- CÁC TRƯỜNG KHÁC ---
                 else:
@@ -354,5 +354,6 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
