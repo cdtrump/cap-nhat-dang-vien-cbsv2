@@ -220,10 +220,12 @@ if app_mode == "👤 Cập nhật thông tin":
             
             # --- DANH SÁCH CÁC TRƯỜNG KHÔNG BẮT BUỘC (OPTIONAL) ---
             # Bạn điền chính xác tên cột gốc vào đây
+            # --- DANH SÁCH CÁC TRƯỜNG KHÔNG BẮT BUỘC (OPTIONAL) ---
             OPTIONAL_COLS = [
                 'Số thẻ Đảng* (12 số theo HD38-HD/BTCTW)',
                 'Ngày cấp thẻ Đảng (dd/mm/yyyy)',
-                'Số thẻ theo Đảng quyết định 85'
+                'Số thẻ theo Đảng quyết định 85',
+                'Ngày vào Đảng chính thức* (dd/mm/yyyy)' 
             ]
             
             for col in ALL_COLUMNS:
@@ -233,7 +235,7 @@ if app_mode == "👤 Cập nhật thông tin":
                 display_label = col
                 if col in OPTIONAL_COLS:
                     # Xóa dấu * nếu có để tránh hiểu nhầm
-                    display_label = col.replace('*', '') + " (Không bắt buộc)"
+                    display_label = col.replace('*', '')
                 
                 # --- 1. TRƯỜNG HỢP CHỈ ĐỌC ---
                 if col in READ_ONLY_COLS:
@@ -429,6 +431,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
