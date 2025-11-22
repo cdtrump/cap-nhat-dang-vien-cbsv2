@@ -278,7 +278,7 @@ if app_mode == "👤 Cập nhật thông tin":
 
                 val = current_data.get(col, "")
                 
-                # --- XỬ LÝ 1: NƠI ĐĂNG KÝ KHAI SINH (Tách chuỗi) ---
+                # --- XỬ LÝ 1: NƠI ĐĂNG KÝ KHAI SINH (Thêm key unique) ---
                 if col == 'Nơi đăng ký khai sinh - Địa chỉ chi tiết *':
                     val_xa = current_data.get('Temp_XaPhuong_KhaiSinh', '')
                     val_thon = current_data.get('Temp_ThonTo_KhaiSinh', '')
@@ -295,12 +295,16 @@ if app_mode == "👤 Cập nhật thông tin":
                     with col1:
                         input_xa = st.text_input(
                             "Xã/Phường/ Đặc khu *", 
-                            value=str(val_xa), placeholder="Ví dụ: Xã Văn Giang"
+                            value=str(val_xa), 
+                            placeholder="Ví dụ: Xã Văn Giang",
+                            key="ks_xa" # <--- KEY DUY NHẤT
                         )
                     with col2:
                         input_thon = st.text_input(
                             "Địa chỉ chi tiết dưới Phường/Xã (Thôn/Tổ...)*", 
-                            value=str(val_thon), placeholder="Ví dụ: Thôn Hòa Bình Hạ"
+                            value=str(val_thon), 
+                            placeholder="Ví dụ: Thôn Hòa Bình Hạ",
+                            key="ks_thon" # <--- KEY DUY NHẤT
                         )
                     
                     st.caption("💡 Ghép tự động: " + f"{input_thon}, {input_xa}".strip(", "))
@@ -310,7 +314,7 @@ if app_mode == "👤 Cập nhật thông tin":
                     updated_values['Temp_XaPhuong_KhaiSinh'] = input_xa
                     updated_values['Temp_ThonTo_KhaiSinh'] = input_thon
 
-                # --- XỬ LÝ 2: THƯỜNG TRÚ (Tách chuỗi) ---
+                # --- XỬ LÝ 2: THƯỜNG TRÚ (Thêm key unique) ---
                 elif col == 'Thường trú (theo mô hình 2 cấp) - Địa chỉ chi tiết *':
                     val_xa_tt = current_data.get('Temp_XaPhuong_ThuongTru', '')
                     val_thon_tt = current_data.get('Temp_ThonTo_ThuongTru', '')
@@ -327,12 +331,16 @@ if app_mode == "👤 Cập nhật thông tin":
                     with col1:
                         input_xa_tt = st.text_input(
                             "Xã/Phường/ Đặc khu *", 
-                            value=str(val_xa_tt), key="tt_xa", placeholder="Ví dụ: Phường Đồng Tâm"
+                            value=str(val_xa_tt), 
+                            placeholder="Ví dụ: Phường Đồng Tâm",
+                            key="tt_xa" # <--- KEY DUY NHẤT
                         )
                     with col2:
                         input_thon_tt = st.text_input(
                             "Địa chỉ chi tiết dưới Phường/Xã (Thôn/Tổ...)*", 
-                            value=str(val_thon_tt), key="tt_thon", placeholder="Ví dụ: Số 60 Ngách 6/12"
+                            value=str(val_thon_tt), 
+                            placeholder="Ví dụ: Số 60 Ngách 6/12",
+                            key="tt_thon" # <--- KEY DUY NHẤT
                         )
                     
                     st.caption("💡 Ghép tự động: " + f"{input_thon_tt}, {input_xa_tt}".strip(", "))
@@ -342,42 +350,40 @@ if app_mode == "👤 Cập nhật thông tin":
                     updated_values['Temp_XaPhuong_ThuongTru'] = input_xa_tt
                     updated_values['Temp_ThonTo_ThuongTru'] = input_thon_tt
 
-                # --- XỬ LÝ 3: QUÊ QUÁN (Chỉ hiển thị Xã) ---
+                # --- XỬ LÝ 3: QUÊ QUÁN (Thêm key unique) ---
                 elif col == 'Quê quán (theo mô hình 2 cấp) - Địa chỉ chi tiết *':
-                    updated_values[col] = st.text_input("Xã/Phường/ Đặc khu *", value=str(val), placeholder="Ví dụ: Xã Văn Giang")
+                    updated_values[col] = st.text_input(
+                        "Xã/Phường/ Đặc khu *", 
+                        value=str(val), 
+                        placeholder="Ví dụ: Xã Văn Giang",
+                        key="qq_xa" # <--- KEY DUY NHẤT
+                    )
 
-                # --- CÁC TRƯỜNG CÒN LẠI (QUỐC GIA, TỈNH, V.V.) ---
+                # --- CÁC TRƯỜNG CÒN LẠI ---
                 else:
                     display_label = col
-                    
-                    # ======================================================
-                    # ĐOẠN NÀY MỚI QUAN TRỌNG: RÚT GỌN TÊN HIỂN THỊ
-                    # ======================================================
-                    if "Nơi đăng ký khai sinh" in col:
-                         display_label = col.replace("Nơi đăng ký khai sinh - ", "")
-                    elif "Quê quán (theo mô hình 2 cấp)" in col:
-                         display_label = col.replace("Quê quán (theo mô hình 2 cấp) - ", "")
-                    elif "Thường trú (theo mô hình 2 cấp)" in col:
-                         display_label = col.replace("Thường trú (theo mô hình 2 cấp) - ", "")
-                    # ======================================================
+                    if "Nơi đăng ký khai sinh" in col: display_label = col.replace("Nơi đăng ký khai sinh - ", "")
+                    if "Quê quán (theo mô hình 2 cấp)" in col: display_label = col.replace("Quê quán (theo mô hình 2 cấp) - ", "")
+                    if "Thường trú (theo mô hình 2 cấp)" in col: display_label = col.replace("Thường trú (theo mô hình 2 cấp) - ", "")
 
                     if col in OPTIONAL_COLS:
                         display_label = display_label.replace('*', '') + " (Không bắt buộc)"
                     
+                    # QUAN TRỌNG: THÊM KEY=COL VÀO TẤT CẢ WIDGET ĐỂ TRÁNH TRÙNG ID
                     if col in READ_ONLY_COLS:
-                        st.text_input(display_label, value=val, disabled=True)
+                        st.text_input(display_label, value=val, disabled=True, key=col)
                         updated_values[col] = str(val)
                     elif col == 'Trạng thái hoạt động':
                         opts = ["Đang sinh hoạt Đảng", "Đã chuyển sinh hoạt", "Đã từ trần", "Đã ra khỏi Đảng"]
                         idx_opt = opts.index(val) if val in opts else 0
-                        updated_values[col] = st.selectbox(display_label, opts, index=idx_opt)
+                        updated_values[col] = st.selectbox(display_label, opts, index=idx_opt, key=col)
                     elif col == 'Giới tính *':
                         opts = ["Nam", "Nữ"]
                         idx_opt = opts.index(val) if val in opts else 0
-                        updated_values[col] = st.selectbox(display_label, opts, index=idx_opt)
+                        updated_values[col] = st.selectbox(display_label, opts, index=idx_opt, key=col)
                     else:
                         ph = "Để trống nếu chưa có thông tin" if col in OPTIONAL_COLS else ""
-                        updated_values[col] = st.text_input(display_label, value=str(val), placeholder=ph)
+                        updated_values[col] = st.text_input(display_label, value=str(val), placeholder=ph, key=col)
 
             st.write("---")
             submit_update = st.form_submit_button("💾 LƯU THÔNG TIN", type="primary")
@@ -400,7 +406,6 @@ if app_mode == "👤 Cập nhật thông tin":
                 for col_req in REQUIRE_COLUMNS:
                     val_check = str(updated_values.get(col_req, "")).strip()
                     if not val_check or val_check == ",":
-                        # Rút gọn tên cột trong thông báo lỗi
                         clean_name = col_req.replace('*', '')
                         clean_name = clean_name.replace("Nơi đăng ký khai sinh - ", "Khai sinh: ")
                         clean_name = clean_name.replace("Quê quán (theo mô hình 2 cấp) - ", "Quê quán: ")
@@ -425,7 +430,7 @@ if app_mode == "👤 Cập nhật thông tin":
                             
                             st.session_state.step = 4
                             st.rerun()
-                            
+     
                         except Exception as e:
                             st.error(f"Có lỗi hệ thống khi lưu: {e}")
 
@@ -559,6 +564,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
