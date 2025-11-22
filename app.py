@@ -363,7 +363,7 @@ if app_mode == "👤 Cập nhật thông tin":
                             key="ks_thon"
                         )
                     
-                    st.caption("💡 Ghép tự động: " + f"{input_thon}, {input_xa}".strip(", "))
+                    st.caption("💡 Chú ý cách nhập địa chỉ chi tiết dưới Phường/Xã: ví dụ Thôn Hòa Bình Hạ/ Tổ dân số 5/ Số 60 Ngách 6/12 Đội Nhân")
                     
                     final_address = f"{input_thon}, {input_xa}".strip(", ")
                     updated_values[col] = final_address
@@ -397,7 +397,7 @@ if app_mode == "👤 Cập nhật thông tin":
                             key="tt_thon"
                         )
                     
-                    st.caption("💡 Ghép tự động: " + f"{input_thon_tt}, {input_xa_tt}".strip(", "))
+                    st.caption("💡 Chú ý cách nhập địa chỉ chi tiết dưới Phường/Xã: ví dụ Thôn Hòa Bình Hạ/ Tổ dân số 5/ Số 60 Ngách 6/12 Đội Nhân")
 
                     final_address_tt = f"{input_thon_tt}, {input_xa_tt}".strip(", ")
                     updated_values[col] = final_address_tt
@@ -636,6 +636,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
