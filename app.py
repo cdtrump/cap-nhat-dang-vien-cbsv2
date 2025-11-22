@@ -242,7 +242,7 @@ if app_mode == "👤 Cập nhật thông tin":
                 
                 # --- 2. TRƯỜNG HỢP DROPBOX ---
                 elif col == 'Trạng thái hoạt động':
-                    options = ["Đang sinh hoạt Đảng", "Đã chuyển sinh hoạt", "Đã từ trần", "Đã ra khỏi Đảng"]
+                    options = ["Đang sinh hoạt Đảng", "Đã chuyển sinh hoạt"]
                     try: opt_idx = options.index(val)
                     except: opt_idx = 0
                     updated_values[col] = st.selectbox(display_label, options, index=opt_idx)
@@ -255,14 +255,14 @@ if app_mode == "👤 Cập nhật thông tin":
 
                 # --- 3. TRƯỜNG HỢP ĐỊA CHỈ (CÓ GỢI Ý) ---
                 elif "Địa chỉ chi tiết" in col:
-                    st.markdown(f"**{display_label}**") 
+                    st.markdown(f"{display_label}") 
                     updated_values[col] = st.text_input(
                         display_label, 
                         value=str(val), 
                         label_visibility="collapsed",
-                        placeholder="Ví dụ: Thôn Hòa Bình Hạ, Xã Văn Giang, Tỉnh Hưng Yên"
+                        placeholder="Ví dụ: Thôn Hòa Bình Hạ, Xã Văn Giang"
                     )
-                    st.caption("💡 *Định dạng mẫu: Thôn/Xóm/Số nhà, Xã/Phường, Quận/Huyện, Tỉnh/TP*")
+                    st.caption("💡 *Định dạng mẫu: Thôn/Xóm/Số nhà, Xã/Phường*")
                 
                 # --- 4. CÁC TRƯỜNG KHÁC (BAO GỒM CÁC TRƯỜNG OPTIONAL) ---
                 else:
@@ -429,6 +429,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
