@@ -199,67 +199,81 @@ if app_mode == "👤 Cập nhật thông tin":
             st.session_state.step = 1
             st.rerun()
 
-    # --- BƯỚC 3: FORM CẬP NHẬT ---
+# --- BƯỚC 3: FORM CẬP NHẬT ---
     elif st.session_state.step == 3:
         st.subheader("Bước 3: Cập nhật thông tin chi tiết")
         
-        # Load lại data mới nhất để đảm bảo tính toàn vẹn
+        # Load lại data mới nhất
         df, main_sheet, workbook = load_data_main()
         idx = st.session_state.selected_row_index
         
         try:
             current_data = df.loc[idx]
         except KeyError:
-            st.error("Phiên làm việc đã hết hạn hoặc dữ liệu thay đổi. Vui lòng tìm kiếm lại.")
-            if st.button("Quay về trang chủ"):
-                st.session_state.step = 1
-                st.rerun()
+            st.error("Phiên làm việc đã hết hạn. Vui lòng tìm kiếm lại.")
             st.stop()
 
         with st.form("update_form"):
             updated_values = {}
             
-            st.write("kiểm tra và chỉnh sửa các thông tin dưới đây:")
-                 
+            st.write("Kiểm tra và chỉnh sửa các thông tin dưới đây:")
+            
+            # --- DANH SÁCH CÁC TRƯỜNG KHÔNG BẮT BUỘC (OPTIONAL) ---
+            # Bạn điền chính xác tên cột gốc vào đây
+            OPTIONAL_COLS = [
+                'Số thẻ Đảng* (12 số theo HD38-HD/BTCTW)',
+                'Ngày cấp thẻ Đảng (dd/mm/yyyy)',
+                'Số thẻ theo Đảng quyết định 85'
+            ]
+            
             for col in ALL_COLUMNS:
                 val = current_data.get(col, "")
                 
-                # --- TRƯỜNG HỢP CHỈ ĐỌC ---
+                # Xử lý Label hiển thị (Xóa dấu * và thêm chú thích nếu là cột Optional)
+                display_label = col
+                if col in OPTIONAL_COLS:
+                    # Xóa dấu * nếu có để tránh hiểu nhầm
+                    display_label = col.replace('*', '') + " (Không bắt buộc)"
+                
+                # --- 1. TRƯỜNG HỢP CHỈ ĐỌC ---
                 if col in READ_ONLY_COLS:
-                    st.text_input(col, value=val, disabled=True)
+                    st.text_input(display_label, value=val, disabled=True)
                     updated_values[col] = str(val)
                 
-                # --- TRƯỜNG HỢP DROPBOX ---
+                # --- 2. TRƯỜNG HỢP DROPBOX ---
                 elif col == 'Trạng thái hoạt động':
-                    options = ["Đang sinh hoạt Đảng", "Đã chuyển sinh hoạt"]
+                    options = ["Đang sinh hoạt Đảng", "Đã chuyển sinh hoạt", "Đã từ trần", "Đã ra khỏi Đảng"]
                     try: opt_idx = options.index(val)
                     except: opt_idx = 0
-                    updated_values[col] = st.selectbox(col, options, index=opt_idx)
+                    updated_values[col] = st.selectbox(display_label, options, index=opt_idx)
                 
                 elif col == 'Giới tính *':
                     options = ["Nam", "Nữ"]
                     try: opt_idx = options.index(val)
                     except: opt_idx = 0
-                    updated_values[col] = st.selectbox(col, options, index=opt_idx)
+                    updated_values[col] = st.selectbox(display_label, options, index=opt_idx)
 
-                # --- TRƯỜNG HỢP ĐỊA CHỈ (CÓ GỢI Ý) ---
+                # --- 3. TRƯỜNG HỢP ĐỊA CHỈ (CÓ GỢI Ý) ---
                 elif "Địa chỉ chi tiết" in col:
-                    # Hiển thị label
-                    st.markdown(f"{col}") 
-                    
-                    # Ô nhập liệu
+                    st.markdown(f"**{display_label}**") 
                     updated_values[col] = st.text_input(
-                        col, 
+                        display_label, 
                         value=str(val), 
-                        label_visibility="collapsed", # Ẩn label mặc định để dùng markdown phía trên cho đẹp
-                        placeholder="Ví dụ: Thôn Hòa Bình Hạ, Xã Văn Giang"
+                        label_visibility="collapsed",
+                        placeholder="Ví dụ: Thôn Hòa Bình Hạ, Xã Văn Giang, Tỉnh Hưng Yên"
                     )
-                    # Dòng gợi ý màu xám bên dưới
-                    st.caption("💡 *Định dạng mẫu: Số nhà/Tổ/Thôn, Xã/Phường*")
+                    st.caption("💡 *Định dạng mẫu: Thôn/Xóm/Số nhà, Xã/Phường, Quận/Huyện, Tỉnh/TP*")
                 
-                # --- CÁC TRƯỜNG KHÁC ---
+                # --- 4. CÁC TRƯỜNG KHÁC (BAO GỒM CÁC TRƯỜNG OPTIONAL) ---
                 else:
-                    updated_values[col] = st.text_input(col, value=str(val))
+                    # Nếu là trường optional thì thêm placeholder để người dùng biết có thể bỏ qua
+                    placeholder_text = "Để trống nếu chưa có thông tin" if col in OPTIONAL_COLS else ""
+                    
+                    updated_values[col] = st.text_input(
+                        display_label, 
+                        value=str(val),
+                        placeholder=placeholder_text
+                    )
 
             st.write("---")
             submit_update = st.form_submit_button("💾 LƯU THÔNG TIN", type="primary")
@@ -267,23 +281,18 @@ if app_mode == "👤 Cập nhật thông tin":
             if submit_update:
                 with st.spinner("Đang lưu dữ liệu lên hệ thống..."):
                     try:
-                        # 1. Chuẩn bị dữ liệu
                         row_vals = [updated_values[col] for col in ALL_COLUMNS]
                         
-                        # 2. Ghi vào Sheet BACKUP (Thử ghi, nếu lỗi thì bỏ qua để ko chặn user)
+                        # Ghi Backup (Thử ghi, lỗi bỏ qua)
                         try:
                             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                            backup_sheet = workbook.worksheet(SHEET_NAME_BACKUP)
-                            backup_sheet.append_row([timestamp] + row_vals)
-                        except Exception as e_backup:
-                            print(f"Lỗi backup: {e_backup}") # Log lỗi ngầm
+                            workbook.worksheet(SHEET_NAME_BACKUP).append_row([timestamp] + row_vals)
+                        except: pass
 
-                        # 3. Cập nhật vào Sheet CHÍNH
-                        # Index pandas bắt đầu từ 0, header sheet chiếm 1 dòng -> row thực tế = index + 2
+                        # Ghi Main
                         sheet_row_number = idx + 2 
                         main_sheet.update(f"A{sheet_row_number}", [row_vals])
                         
-                        # === CHUYỂN HƯỚNG SANG BƯỚC 4 (THÀNH CÔNG) ===
                         st.session_state.step = 4
                         st.rerun()
                         
@@ -420,6 +429,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
