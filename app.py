@@ -336,13 +336,13 @@ if app_mode == "👤 Cập nhật thông tin":
                 else:
                     display_label = col
                     if col in OPTIONAL_COLS:
-                        display_label = col.replace('*', '') + " (Không bắt buộc)"
+                        display_label = col.replace('*', '')"
                     
                     if col in READ_ONLY_COLS:
                         st.text_input(display_label, value=val, disabled=True)
                         updated_values[col] = str(val)
                     elif col == 'Trạng thái hoạt động':
-                        opts = ["Đang sinh hoạt Đảng", "Đã chuyển sinh hoạt", "Đã từ trần", "Đã ra khỏi Đảng"]
+                        opts = ["Đang sinh hoạt Đảng", "Đã chuyển sinh hoạt"]
                         idx_opt = opts.index(val) if val in opts else 0
                         updated_values[col] = st.selectbox(display_label, opts, index=idx_opt)
                     elif col == 'Giới tính *':
@@ -382,7 +382,7 @@ if app_mode == "👤 Cập nhật thông tin":
                 if missing_fields:
                     st.error("⚠️ KHÔNG THỂ LƯU! Bạn chưa điền các thông tin bắt buộc sau:", icon="🚫")
                     for field in missing_fields:
-                        st.markdown(f"- **{field}**")
+                        st.markdown(f"- {field}")
                 else:
                     with st.spinner("Đang lưu dữ liệu..."):
                         try:
@@ -533,6 +533,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
