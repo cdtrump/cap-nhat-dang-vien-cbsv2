@@ -338,7 +338,7 @@ if app_mode == "👤 Cập nhật thông tin":
             # 1. KHAI SINH
             # ========================================================
             if col == 'Nơi đăng ký khai sinh - Quốc gia *':
-                st.markdown("---"); st.subheader("1. THÔNG TIN KHAI SINH")
+                st.markdown("---"); st.subheader("🏠 THÔNG TIN KHAI SINH")
                 is_russia = str(val).strip().upper() in ["LIÊN BANG NGA", "NGA", "RUSSIA"]
                 ks_quocgia = st.radio("Quốc gia *", ["Việt Nam", "Liên Bang Nga"], index=1 if is_russia else 0, horizontal=True, key="ks_qg")
                 updated_values[col] = ks_quocgia
@@ -389,7 +389,7 @@ if app_mode == "👤 Cập nhật thông tin":
             # 2. QUÊ QUÁN
             # ========================================================
             elif col == 'Quê quán (theo mô hình 2 cấp) - Quốc gia *':
-                st.markdown("---"); st.subheader("2. THÔNG TIN QUÊ QUÁN")
+                st.markdown("---"); st.subheader("🏠 THÔNG TIN QUÊ QUÁN")
                 st.text_input("Quốc gia *", value="Việt Nam", disabled=True, key="qq_qg")
                 updated_values[col] = "Việt Nam"
 
@@ -411,7 +411,7 @@ if app_mode == "👤 Cập nhật thông tin":
             # 3. THƯỜNG TRÚ
             # ========================================================
             elif col == 'Thường trú (theo mô hình 2 cấp) - Quốc gia *':
-                st.markdown("---"); st.subheader("3. THÔNG TIN THƯỜNG TRÚ")
+                st.markdown("---"); st.subheader("🏠 THÔNG TIN THƯỜNG TRÚ")
                 st.text_input("Quốc gia *", value="Việt Nam", disabled=True, key="tt_qg")
                 updated_values[col] = "Việt Nam"
 
@@ -663,6 +663,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
