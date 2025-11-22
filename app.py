@@ -84,21 +84,28 @@ st.markdown("""
     /* Chỉ áp dụng khi màn hình nhỏ hơn 768px (Điện thoại dọc) */
     @media only screen and (max-width: 768px) {
         
-        /* 1. Thu nhỏ tiêu đề chính (H1) */
-        h1 {
-            font-size: 1.8rem !important; /* Giảm kích thước */
-            padding-top: 0rem !important; /* Giảm khoảng cách trên cùng */
+        /* 1. Chỉnh lại container chính để không bị che bởi thanh menu trên cùng */
+        .block-container {
+            padding-top: 4.5rem !important; /* Tăng từ 2rem lên 4.5rem */
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
         }
         
-        /* 2. Thu nhỏ tiêu đề phụ (H2, H3) - Ví dụ: Bước 1... */
+        /* 2. Thu nhỏ tiêu đề chính (H1) */
+        h1 {
+            font-size: 1.6rem !important; /* Giảm thêm chút nữa cho gọn */
+            padding-top: 0rem !important;
+        }
+        
+        /* 3. Thu nhỏ tiêu đề phụ (H2, H3) */
         h2 {
-            font-size: 1.4rem !important;
+            font-size: 1.3rem !important;
         }
         h3 {
-            font-size: 1.2rem !important;
+            font-size: 1.1rem !important;
         }
         
-        /* 3. Thu nhỏ chữ trong ô nhập liệu và nhãn (Họ tên, ngày sinh) */
+        /* 4. Thu nhỏ chữ trong ô nhập liệu và nhãn */
         .stTextInput label, .stSelectbox label {
             font-size: 0.9rem !important;
         }
@@ -106,16 +113,10 @@ st.markdown("""
             font-size: 0.9rem !important;
         }
         
-        /* 4. Thu nhỏ chữ trong nút bấm */
+        /* 5. Chỉnh nút bấm */
         .stButton button {
             font-size: 1rem !important;
-        }
-        
-        /* 5. Giảm lề trắng thừa thãi xung quanh trang trên mobile */
-        .block-container {
-            padding-top: 2rem !important;
-            padding-left: 1rem !important;
-            padding-right: 1rem !important;
+            width: 100% !important; /* Cho nút bấm full chiều ngang bấm cho dễ */
         }
     }
     </style>
@@ -218,7 +219,7 @@ if app_mode == "👤 Cập nhật thông tin":
         with st.form("update_form"):
             updated_values = {}
             
-            st.write("kiểm tra và chỉnh sửa các thông tin dưới đây (nếu sai):")
+            st.write("kiểm tra và chỉnh sửa các thông tin dưới đây:")
                  
             for col in ALL_COLUMNS:
                 val = current_data.get(col, "")
@@ -419,6 +420,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
