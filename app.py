@@ -281,25 +281,76 @@ if app_mode == "👤 Cập nhật thông tin":
             submit_update = st.form_submit_button("💾 LƯU THÔNG TIN", type="primary")
 
             if submit_update:
-                with st.spinner("Đang lưu dữ liệu lên hệ thống..."):
-                    try:
-                        row_vals = [updated_values[col] for col in ALL_COLUMNS]
-                        
-                        # Ghi Backup (Thử ghi, lỗi bỏ qua)
-                        try:
-                            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                            workbook.worksheet(SHEET_NAME_BACKUP).append_row([timestamp] + row_vals)
-                        except: pass
+                # --- DANH SÁCH CÁC CỘT BẮT BUỘC (HARDCODE) ---
+                # Đây là danh sách bạn yêu cầu, hệ thống sẽ chỉ kiểm tra các cột này
+                REQUIRE_COLUMNS = [
+                    'STT', 
+                    'ID', 
+                    'Họ và tên *', 
+                    'Giới tính *', 
+                    'Sinh ngày * (dd/mm/yyyy)',
+                    'Dân tộc *', 
+                    'Tôn giáo *', 
+                    'Số định danh cá nhân *',
+                    'Nơi đăng ký khai sinh - Quốc gia *',
+                    'Nơi đăng ký khai sinh - Tỉnh *', 
+                    'Nơi đăng ký khai sinh - Địa chỉ chi tiết *',
+                    'Quê quán (theo mô hình 2 cấp) - Quốc gia *', 
+                    'Quê quán (theo mô hình 2 cấp) - Tỉnh *',
+                    'Quê quán (theo mô hình 2 cấp) - Địa chỉ chi tiết *', 
+                    'Thường trú (theo mô hình 2 cấp) - Quốc gia *',
+                    'Thường trú (theo mô hình 2 cấp) - Tỉnh *', 
+                    'Thường trú (theo mô hình 2 cấp) - Địa chỉ chi tiết *',
+                    'Ngày vào Đảng* (dd/mm/yyyy)', 
+                    'Trạng thái hoạt động'
+                ]
 
-                        # Ghi Main
-                        sheet_row_number = idx + 2 
-                        main_sheet.update(f"A{sheet_row_number}", [row_vals])
+                # --- BƯỚC KIỂM TRA DỮ LIỆU (VALIDATION) ---
+                missing_fields = []
+                
+                for col in REQUIRE_COLUMNS:
+                    # Lấy giá trị user nhập (hoặc giá trị cũ nếu là readonly)
+                    # .strip() để xóa khoảng trắng thừa đầu cuối
+                    user_input = str(updated_values.get(col, "")).strip()
+                    
+                    # Nếu giá trị rỗng -> Báo lỗi
+                    if not user_input:
+                        # Bỏ dấu * trong tên cột cho thông báo lỗi dễ đọc hơn
+                        display_name = col.replace('*', '')
+                        missing_fields.append(display_name)
+                
+                # --- XỬ LÝ KẾT QUẢ ---
+                if missing_fields:
+                    # TRƯỜNG HỢP LỖI: CHẶN LƯU
+                    st.error("⚠️ KHÔNG THỂ LƯU! Bạn chưa điền các thông tin bắt buộc sau:", icon="🚫")
+                    
+                    # Hiển thị danh sách lỗi rõ ràng
+                    for field in missing_fields:
+                        st.markdown(f"- **{field}**")
                         
-                        st.session_state.step = 4
-                        st.rerun()
-                        
-                    except Exception as e:
-                        st.error(f"Có lỗi xảy ra khi lưu: {e}")
+                else:
+                    # TRƯỜNG HỢP HỢP LỆ: TIẾN HÀNH LƯU
+                    with st.spinner("Đang kiểm tra và lưu dữ liệu..."):
+                        try:
+                            row_vals = [updated_values[col] for col in ALL_COLUMNS]
+                            
+                            # 1. Ghi vào Sheet BACKUP
+                            try:
+                                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                workbook.worksheet(SHEET_NAME_BACKUP).append_row([timestamp] + row_vals)
+                            except Exception as e:
+                                print(f"Lỗi backup: {e}") # Log ngầm, không báo user
+
+                            # 2. Ghi vào Sheet CHÍNH
+                            sheet_row_number = idx + 2 
+                            main_sheet.update(f"A{sheet_row_number}", [row_vals])
+                            
+                            # 3. Chuyển sang màn hình thành công
+                            st.session_state.step = 4
+                            st.rerun()
+                            
+                        except Exception as e:
+                            st.error(f"Có lỗi hệ thống khi lưu: {e}")
 
         if st.button("Hủy bỏ"):
             st.session_state.step = 2
@@ -431,6 +482,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
