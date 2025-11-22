@@ -9,27 +9,57 @@ import io
 ADMIN_PASSWORD = st.secrets["admin_password"]
 
 
+# --- CẤU HÌNH ---
+# Danh sách cột CHÍNH XÁC (33 cột)
 ALL_COLUMNS = [
-    'STT', 'ID', 'Họ và tên *', 'Tên gọi khác', 'Giới tính *', 'Sinh ngày * (dd/mm/yyyy)',
-    'Dân tộc *', 'Tôn giáo *', 'Số định danh cá nhân *', 'Số thẻ Đảng* (12 số theo HD38-HD/BTCTW)',
-    'Nơi cấp thẻ Đảng', 'Ngày cấp thẻ Đảng (dd/mm/yyyy)', 'Số thẻ theo Đảng quyết định 85',
-    'Tổ chức Đảng đang sinh hoạt * (không sửa)', 'Nơi đăng ký khai sinh - Quốc gia *',
-    'Nơi đăng ký khai sinh - Tỉnh *', 'Nơi đăng ký khai sinh - Địa chỉ chi tiết *',
-    'Quê quán (theo mô hình 2 cấp) - Quốc gia *', 'Quê quán (theo mô hình 2 cấp) - Tỉnh *',
-    'Quê quán (theo mô hình 2 cấp) - Địa chỉ chi tiết *', 'Thường trú (theo mô hình 2 cấp) - Quốc gia *',
-    'Thường trú (theo mô hình 2 cấp) - Tỉnh *', 'Thường trú (theo mô hình 2 cấp) - Địa chỉ chi tiết *',
-    'Ngày vào Đảng* (dd/mm/yyyy)', 'Ngày vào Đảng chính thức* (dd/mm/yyyy)', 'Số CMND cũ (nếu có)',
-    'Trạng thái hoạt động', 'Ngày rời khỏi/ Ngày mất/ Ngày miễn sinh hoạt Đảng (dd/mm/yyyy)',
-    'Temp_XaPhuong_KhaiSinh', 'Temp_ThonTo_KhaiSinh', 
-    'Temp_XaPhuong_ThuongTru', 'Temp_ThonTo_ThuongTru'
+    'STT', 
+    'ID', 
+    'Họ và tên *', 
+    'Tên gọi khác', 
+    'Giới tính *', 
+    'Sinh ngày * (dd/mm/yyyy)',
+    'Dân tộc *', 
+    'Tôn giáo *', 
+    'Số định danh cá nhân *', 
+    'Số thẻ Đảng* (12 số theo HD38-HD/BTCTW)',
+    'Nơi cấp thẻ Đảng', 
+    'Ngày cấp thẻ Đảng (dd/mm/yyyy)', 
+    'Số thẻ theo Đảng quyết định 85',
+    'Tổ chức Đảng đang sinh hoạt * (không sửa)', 
+    'Nơi đăng ký khai sinh - Quốc gia *',
+    'Nơi đăng ký khai sinh - Tỉnh *', 
+    'Nơi đăng ký khai sinh - Địa chỉ chi tiết *',
+    'Quê quán (theo mô hình 2 cấp) - Quốc gia *', 
+    'Quê quán (theo mô hình 2 cấp) - Tỉnh *',
+    'Quê quán (theo mô hình 2 cấp) - Địa chỉ chi tiết *', 
+    'Thường trú (theo mô hình 2 cấp) - Quốc gia *',
+    'Thường trú (theo mô hình 2 cấp) - Tỉnh *', 
+    'Thường trú (theo mô hình 2 cấp) - Địa chỉ chi tiết *',
+    'Ngày vào Đảng* (dd/mm/yyyy)', 
+    'Ngày vào Đảng chính thức* (dd/mm/yyyy)', 
+    'Số CMND cũ (nếu có)',
+    'Trạng thái hoạt động', 
+    'Ngày rời khỏi/ Ngày mất/ Ngày miễn sinh hoạt Đảng (dd/mm/yyyy)',
+    
+    # --- CỘT NÀY QUAN TRỌNG: Cần giữ lại để giữ chỗ, dù không dùng ---
+    'Đề nghị xóa (do đang viên không thuộc chi bộ)/ (Nếu muốn xóa chọn "có", còn không bỏ qua)',
+    
+    # --- 4 CỘT PHỤ MỚI THÊM ---
+    'Temp_XaPhuong_KhaiSinh', 
+    'Temp_ThonTo_KhaiSinh', 
+    'Temp_XaPhuong_ThuongTru', 
+    'Temp_ThonTo_ThuongTru'
 ]
 
-# Danh sách các cột phụ để code biết đường bỏ qua vòng lặp mặc định
+# Danh sách cột phụ
 TEMP_COLS = ['Temp_XaPhuong_KhaiSinh', 'Temp_ThonTo_KhaiSinh', 'Temp_XaPhuong_ThuongTru', 'Temp_ThonTo_ThuongTru']
 
+# Cột này chỉ đọc, không cho sửa
 READ_ONLY_COLS = [
     'STT', 'ID', 'Họ và tên *', 'Sinh ngày * (dd/mm/yyyy)', 
-    'Tổ chức Đảng đang sinh hoạt * (không sửa)'
+    'Tổ chức Đảng đang sinh hoạt * (không sửa)',
+    # Thêm cột rác này vào readonly để user không quan tâm
+    'Đề nghị xóa (do đang viên không thuộc chi bộ)/ (Nếu muốn xóa chọn "có", còn không bỏ qua)'
 ]
 
 SHEET_NAME_MAIN = "Sheet1"
@@ -533,6 +563,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
