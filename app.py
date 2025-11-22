@@ -79,6 +79,47 @@ def load_data_main():
 
 # --- GIAO DIỆN CHÍNH ---
 st.set_page_config(page_title="Cập nhật thông tin Đảng viên CBSV II -NEU", layout="wide")
+st.markdown("""
+    <style>
+    /* Chỉ áp dụng khi màn hình nhỏ hơn 768px (Điện thoại dọc) */
+    @media only screen and (max-width: 768px) {
+        
+        /* 1. Thu nhỏ tiêu đề chính (H1) */
+        h1 {
+            font-size: 1.8rem !important; /* Giảm kích thước */
+            padding-top: 0rem !important; /* Giảm khoảng cách trên cùng */
+        }
+        
+        /* 2. Thu nhỏ tiêu đề phụ (H2, H3) - Ví dụ: Bước 1... */
+        h2 {
+            font-size: 1.4rem !important;
+        }
+        h3 {
+            font-size: 1.2rem !important;
+        }
+        
+        /* 3. Thu nhỏ chữ trong ô nhập liệu và nhãn (Họ tên, ngày sinh) */
+        .stTextInput label, .stSelectbox label {
+            font-size: 0.9rem !important;
+        }
+        .stTextInput input {
+            font-size: 0.9rem !important;
+        }
+        
+        /* 4. Thu nhỏ chữ trong nút bấm */
+        .stButton button {
+            font-size: 1rem !important;
+        }
+        
+        /* 5. Giảm lề trắng thừa thãi xung quanh trang trên mobile */
+        .block-container {
+            padding-top: 2rem !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+        }
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # --- SIDEBAR MENU ---
 st.sidebar.title("Menu")
@@ -378,6 +419,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
