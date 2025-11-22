@@ -307,7 +307,7 @@ if app_mode == "👤 Cập nhật thông tin":
                             key="ks_thon" # <--- KEY DUY NHẤT
                         )
                     
-                    st.caption("💡 CHÚ Ý: Địa chỉ chi tiết dưới Phường/Xã: ví dụ Thôn Hòa Bình Hạ/ Tổ dân số 5/ Số 60 Ngách 6/12 Đội Nhân. KẾT QUẢ NHẬP: " + f"{input_thon}, {input_xa}".strip(", "))
+                    st.caption("💡 CÁCH NHẬP địa chỉ chi tiết dưới Phường/Xã: ví dụ Thôn Hòa Bình Hạ/ Tổ dân số 5/ Số 60 Ngách 6/12 Đội Nhân")
                     
                     final_address = f"{input_thon}, {input_xa}".strip(", ")
                     updated_values[col] = final_address
@@ -343,7 +343,7 @@ if app_mode == "👤 Cập nhật thông tin":
                             key="tt_thon" # <--- KEY DUY NHẤT
                         )
                     
-                    st.caption("💡 CHÚ Ý: Địa chỉ chi tiết dưới Phường/Xã: ví dụ Thôn Hòa Bình Hạ/ Tổ dân số 5/ Số 60 Ngách 6/12 Đội Nhân. KẾT QUẢ NHẬP: " + f"{input_thon}, {input_xa}".strip(", "))
+                    st.caption("💡 CÁCH NHẬP địa chỉ chi tiết dưới Phường/Xã: ví dụ Thôn Hòa Bình Hạ/ Tổ dân số 5/ Số 60 Ngách 6/12 Đội Nhân")
 
                     final_address_tt = f"{input_thon_tt}, {input_xa_tt}".strip(", ")
                     updated_values[col] = final_address_tt
@@ -367,7 +367,7 @@ if app_mode == "👤 Cập nhật thông tin":
                     if "Thường trú (theo mô hình 2 cấp)" in col: display_label = col.replace("Thường trú (theo mô hình 2 cấp) - ", "")
 
                     if col in OPTIONAL_COLS:
-                        display_label = display_label.replace('*', '') + " (Không bắt buộc)"
+                        display_label = display_label.replace('*', '')
                     
                     # QUAN TRỌNG: THÊM KEY=COL VÀO TẤT CẢ WIDGET ĐỂ TRÁNH TRÙNG ID
                     if col in READ_ONLY_COLS:
@@ -564,6 +564,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
