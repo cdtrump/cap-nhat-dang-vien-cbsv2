@@ -451,7 +451,7 @@ if app_mode == "👤 Cập nhật thông tin":
                 for p in ["Nơi đăng ký khai sinh - ", "Quê quán (theo mô hình 2 cấp) - ", "Thường trú (theo mô hình 2 cấp) - "]:
                     clean_label = clean_label.replace(p, "")
                 
-                if col in OPTIONAL_COLS: clean_label = clean_label.replace('*', '') + " (Không bắt buộc)"
+                if col in OPTIONAL_COLS: clean_label = clean_label.replace('*', '')
 
                 if col in READ_ONLY_COLS:
                     st.text_input(clean_label, value=val, disabled=True, key=col)
@@ -663,6 +663,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
