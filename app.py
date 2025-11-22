@@ -78,7 +78,7 @@ def load_data_main():
     return df, sheet, workbook
 
 # --- GIAO DIỆN CHÍNH ---
-st.set_page_config(page_title="Hệ thống Quản lý Đảng viên", layout="wide")
+st.set_page_config(page_title="Cập nhật thông tin Đảng viên CBSV II -NEU", layout="wide")
 
 # --- SIDEBAR MENU ---
 st.sidebar.title("Menu")
@@ -354,6 +354,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
