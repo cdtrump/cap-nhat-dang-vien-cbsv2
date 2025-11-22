@@ -60,95 +60,184 @@ st.sidebar.title("Menu")
 app_mode = st.sidebar.radio("Chọn chức năng:", ["👤 Cập nhật thông tin", "📊 Admin Dashboard"])
 
 # =========================================================
-# CHẾ ĐỘ 1: NGƯỜI DÙNG CẬP NHẬT (Code cũ)
+# CHẾ ĐỘ 1: NGƯỜI DÙNG CẬP NHẬT
 # =========================================================
 if app_mode == "👤 Cập nhật thông tin":
     st.title("📝 Cập nhật thông tin Đảng viên")
     
-    if 'step' not in st.session_state: st.session_state.step = 1
-    if 'selected_row_index' not in st.session_state: st.session_state.selected_row_index = None
+    # Khởi tạo state nếu chưa có
+    if 'step' not in st.session_state:
+        st.session_state.step = 1
+    if 'selected_row_index' not in st.session_state:
+        st.session_state.selected_row_index = None
 
-    # Bước 1: Tìm kiếm
+    # --- BƯỚC 1: TÌM KIẾM ---
     if st.session_state.step == 1:
-        st.subheader("Tra cứu thông tin cá nhân")
+        st.subheader("Bước 1: Tra cứu thông tin cá nhân")
         with st.form("search_form"):
             col_s1, col_s2 = st.columns(2)
-            with col_s1: search_name = st.text_input("Họ và tên (đầy đủ có dấu):")
-            with col_s2: search_dob = st.text_input("Ngày sinh (dd/mm/yyyy):", placeholder="05/01/2005")
-            submitted = st.form_submit_button("Tra cứu")
+            with col_s1:
+                search_name = st.text_input("Họ và tên (đầy đủ có dấu):")
+            with col_s2:
+                search_dob = st.text_input("Ngày sinh (dd/mm/yyyy):", placeholder="Ví dụ: 05/01/2005")
+            
+            submitted = st.form_submit_button("Tra cứu", type="primary")
 
             if submitted:
                 if not search_name or not search_dob:
-                    st.warning("Vui lòng nhập đầy đủ thông tin.")
+                    st.warning("Vui lòng nhập đầy đủ Họ tên và Ngày sinh.")
                 else:
-                    df, _, _ = load_data_main()
-                    mask = (df['Họ và tên *'].str.strip().str.lower() == search_name.strip().lower()) & \
-                           (df['Sinh ngày * (dd/mm/yyyy)'] == search_dob.strip())
-                    results = df[mask]
-                    if results.empty:
-                        st.error("❌ Không tìm thấy thông tin.")
-                    else:
-                        st.session_state.search_results = results
-                        st.session_state.step = 2
-                        st.rerun()
+                    with st.spinner("Đang tìm kiếm..."):
+                        df, _, _ = load_data_main()
+                        # Lọc dữ liệu (Case insensitive)
+                        mask = (
+                            df['Họ và tên *'].str.strip().str.lower() == search_name.strip().lower()
+                        ) & (
+                            df['Sinh ngày * (dd/mm/yyyy)'] == search_dob.strip()
+                        )
+                        results = df[mask]
 
-    # Bước 2: Chọn người
+                        if results.empty:
+                            st.error("❌ Không tìm thấy thông tin hoặc bạn không thuộc diện cần cập nhật.")
+                            st.info("Lưu ý: Kiểm tra kỹ chính tả và định dạng ngày sinh (dd/mm/yyyy).")
+                        else:
+                            st.success(f"Tìm thấy {len(results)} kết quả.")
+                            st.session_state.search_results = results
+                            st.session_state.step = 2
+                            st.rerun()
+
+    # --- BƯỚC 2: CHỌN NGƯỜI ---
     elif st.session_state.step == 2:
-        st.subheader("Xác nhận danh tính")
+        st.subheader("Bước 2: Xác nhận danh tính")
         results = st.session_state.search_results
+        
+        st.info("Vui lòng chọn đúng tên của bạn trong danh sách dưới đây:")
+        
         for index, row in results.iterrows():
             with st.container(border=True):
                 c1, c2 = st.columns([4, 1])
-                c1.markdown(f"**{row['Họ và tên *']}** - {row['Sinh ngày * (dd/mm/yyyy)']}")
-                c1.text(f"Đơn vị: {row['Tổ chức Đảng đang sinh hoạt * (không sửa)']}")
-                if c2.button("CẬP NHẬT", key=f"btn_{index}"):
-                    st.session_state.selected_row_index = index
-                    st.session_state.step = 3
-                    st.rerun()
-        if st.button("⬅️ Quay lại"):
+                with c1:
+                    st.markdown(f"**{row['Họ và tên *']}** - Sinh ngày: {row['Sinh ngày * (dd/mm/yyyy)']}")
+                    st.text(f"Đơn vị: {row['Tổ chức Đảng đang sinh hoạt * (không sửa)']}")
+                    st.text(f"Ngày vào Đảng: {row['Ngày vào Đảng* (dd/mm/yyyy)']}")
+                with c2:
+                    # Lưu index thực của dòng trong DataFrame gốc
+                    if st.button("CẬP NHẬT", key=f"btn_{index}", type="primary"):
+                        st.session_state.selected_row_index = index
+                        st.session_state.step = 3
+                        st.rerun()
+        
+        st.write("---")
+        if st.button("⬅️ Quay lại tìm kiếm"):
             st.session_state.step = 1
             st.rerun()
 
-    # Bước 3: Form cập nhật
+    # --- BƯỚC 3: FORM CẬP NHẬT ---
     elif st.session_state.step == 3:
-        st.subheader("Cập nhật thông tin chi tiết")
+        st.subheader("Bước 3: Cập nhật thông tin chi tiết")
+        
+        # Load lại data mới nhất để đảm bảo tính toàn vẹn
         df, main_sheet, workbook = load_data_main()
         idx = st.session_state.selected_row_index
-        current_data = df.loc[idx]
+        
+        try:
+            current_data = df.loc[idx]
+        except KeyError:
+            st.error("Phiên làm việc đã hết hạn hoặc dữ liệu thay đổi. Vui lòng tìm kiếm lại.")
+            if st.button("Quay về trang chủ"):
+                st.session_state.step = 1
+                st.rerun()
+            st.stop()
 
         with st.form("update_form"):
             updated_values = {}
+            
+            st.write("kiểm tra và chỉnh sửa các thông tin dưới đây (nếu sai):")
+            
             for col in ALL_COLUMNS:
                 val = current_data.get(col, "")
+                
+                # Các trường không được sửa
                 if col in READ_ONLY_COLS:
                     st.text_input(col, value=val, disabled=True)
                     updated_values[col] = str(val)
+                
+                # Dropdown trạng thái
                 elif col == 'Trạng thái hoạt động':
-                    opts = ["Đang sinh hoạt Đảng", "Đã chuyển sinh hoạt", "Đã từ trần", "Đã ra khỏi Đảng"]
-                    updated_values[col] = st.selectbox(col, opts, index=opts.index(val) if val in opts else 0)
+                    options = ["Đang sinh hoạt Đảng", "Đã chuyển sinh hoạt", "Đã từ trần", "Đã ra khỏi Đảng"]
+                    try:
+                        opt_idx = options.index(val)
+                    except ValueError:
+                        opt_idx = 0
+                    updated_values[col] = st.selectbox(col, options, index=opt_idx)
+                
+                # Dropdown Giới tính
                 elif col == 'Giới tính *':
-                    opts = ["Nam", "Nữ"]
-                    updated_values[col] = st.selectbox(col, opts, index=opts.index(val) if val in opts else 0)
+                    options = ["Nam", "Nữ"]
+                    try:
+                         opt_idx = options.index(val)
+                    except:
+                        opt_idx = 0
+                    updated_values[col] = st.selectbox(col, options, index=opt_idx)
+
+                # Các trường nhập liệu bình thường
                 else:
                     updated_values[col] = st.text_input(col, value=str(val))
-            
-            if st.form_submit_button("💾 LƯU THÔNG TIN"):
-                try:
-                    row_vals = [updated_values[col] for col in ALL_COLUMNS]
-                    # Ghi Backup
+
+            st.write("---")
+            submit_update = st.form_submit_button("💾 LƯU THÔNG TIN", type="primary")
+
+            if submit_update:
+                with st.spinner("Đang lưu dữ liệu lên hệ thống..."):
                     try:
-                        workbook.worksheet(SHEET_NAME_BACKUP).append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S")] + row_vals)
-                    except: pass 
-                    # Ghi Main
-                    main_sheet.update(f"A{idx + 2}", [row_vals])
-                    st.success("✅ Cập nhật thành công!"); st.balloons()
-                    st.session_state.step = 1
-                    st.session_state.selected_row_index = None
-                    st.rerun()
-                except Exception as e: st.error(f"Lỗi: {e}")
-        
-        if st.button("Hủy"):
+                        # 1. Chuẩn bị dữ liệu
+                        row_vals = [updated_values[col] for col in ALL_COLUMNS]
+                        
+                        # 2. Ghi vào Sheet BACKUP (Thử ghi, nếu lỗi thì bỏ qua để ko chặn user)
+                        try:
+                            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            backup_sheet = workbook.worksheet(SHEET_NAME_BACKUP)
+                            backup_sheet.append_row([timestamp] + row_vals)
+                        except Exception as e_backup:
+                            print(f"Lỗi backup: {e_backup}") # Log lỗi ngầm
+
+                        # 3. Cập nhật vào Sheet CHÍNH
+                        # Index pandas bắt đầu từ 0, header sheet chiếm 1 dòng -> row thực tế = index + 2
+                        sheet_row_number = idx + 2 
+                        main_sheet.update(f"A{sheet_row_number}", [row_vals])
+                        
+                        # === CHUYỂN HƯỚNG SANG BƯỚC 4 (THÀNH CÔNG) ===
+                        st.session_state.step = 4
+                        st.rerun()
+                        
+                    except Exception as e:
+                        st.error(f"Có lỗi xảy ra khi lưu: {e}")
+
+        if st.button("Hủy bỏ"):
             st.session_state.step = 2
+            st.rerun()
+
+    # --- BƯỚC 4: MÀN HÌNH THÔNG BÁO THÀNH CÔNG (MỚI) ---
+    elif st.session_state.step == 4:
+        st.balloons() # Hiệu ứng pháo giấy
+        
+        st.success("✅ CẬP NHẬT THÀNH CÔNG!", icon="✅")
+        
+        st.markdown("""
+        <div style="padding: 20px; border: 1px solid #4CAF50; border-radius: 10px; background-color: #E8F5E9; color: #2E7D32;">
+            <h3 style="margin:0">Dữ liệu đã được lưu an toàn.</h3>
+            <p>Cảm ơn đồng chí đã cập nhật thông tin.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.write("")
+        st.write("")
+        
+        if st.button("⬅️ Quay về trang tìm kiếm để cập nhật người khác", type="primary", use_container_width=True):
+            # Reset toàn bộ session để về trạng thái ban đầu
+            st.session_state.step = 1
+            st.session_state.selected_row_index = None
+            st.session_state.search_results = None
             st.rerun()
 
 # =========================================================
@@ -228,4 +317,5 @@ elif app_mode == "📊 Admin Dashboard":
     elif password:
         st.error("Sai mật khẩu!")
     else:
+
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
