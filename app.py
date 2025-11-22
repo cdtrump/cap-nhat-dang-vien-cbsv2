@@ -46,10 +46,35 @@ def connect_to_workbook():
 def load_data_main():
     workbook = connect_to_workbook()
     sheet = workbook.worksheet(SHEET_NAME_MAIN)
+    
+    # Lấy toàn bộ giá trị dưới dạng chuỗi (để tránh Google tự convert sang số)
+    # Tuy nhiên get_all_records đôi khi vẫn tự convert, nên ta cần xử lý kỹ ở bước DataFrame
     data = sheet.get_all_records(expected_headers=ALL_COLUMNS)
     df = pd.DataFrame(data)
-    # Ép kiểu ID về string để so sánh
+    
+    # --- XỬ LÝ SỐ 0 Ở ĐẦU ---
+    # Danh sách các cột cần đảm bảo là chuỗi và có số 0
+    cols_need_zero = [
+        'Số định danh cá nhân *', 
+        'Số thẻ Đảng* (12 số theo HD38-HD/BTCTW)',
+        'Số CMND cũ (nếu có)'
+    ]
+    
+    for col in cols_need_zero:
+        if col in df.columns:
+            # Bước 1: Ép về kiểu chuỗi, xử lý lỗi .0 (ví dụ 123.0 -> 123)
+            df[col] = df[col].astype(str).replace(r'\.0$', '', regex=True)
+            
+            # Bước 2: Thay thế 'nan' hoặc chuỗi rỗng bằng ''
+            df[col] = df[col].replace(['nan', 'None', ''], '')
+            
+            # Bước 3: Nếu có dữ liệu (khác rỗng), thêm số 0 vào đầu cho đủ 12 ký tự
+            # Lưu ý: Chỉ fill nếu nó là chuỗi số. Nếu đang trống thì giữ nguyên.
+            df[col] = df[col].apply(lambda x: x.zfill(12) if x.strip() != '' and x.isdigit() else x)
+
+    # Ép kiểu ID về string để so sánh trong logic tìm kiếm
     df['ID'] = df['ID'].astype(str).replace(r'\.0$', '', regex=True)
+    
     return df, sheet, workbook
 
 # --- GIAO DIỆN CHÍNH ---
@@ -153,34 +178,44 @@ if app_mode == "👤 Cập nhật thông tin":
             updated_values = {}
             
             st.write("kiểm tra và chỉnh sửa các thông tin dưới đây (nếu sai):")
-            
+                 
             for col in ALL_COLUMNS:
                 val = current_data.get(col, "")
                 
-                # Các trường không được sửa
+                # --- TRƯỜNG HỢP CHỈ ĐỌC ---
                 if col in READ_ONLY_COLS:
                     st.text_input(col, value=val, disabled=True)
                     updated_values[col] = str(val)
                 
-                # Dropdown trạng thái
+                # --- TRƯỜNG HỢP DROPBOX ---
                 elif col == 'Trạng thái hoạt động':
-                    options = ["Đang sinh hoạt Đảng", "Đã chuyển sinh hoạt", "Đã từ trần", "Đã ra khỏi Đảng"]
-                    try:
-                        opt_idx = options.index(val)
-                    except ValueError:
-                        opt_idx = 0
+                    options = ["Đang sinh hoạt Đảng", "Đã chuyển sinh hoạt"]
+                    try: opt_idx = options.index(val)
+                    except: opt_idx = 0
                     updated_values[col] = st.selectbox(col, options, index=opt_idx)
                 
-                # Dropdown Giới tính
                 elif col == 'Giới tính *':
                     options = ["Nam", "Nữ"]
-                    try:
-                         opt_idx = options.index(val)
-                    except:
-                        opt_idx = 0
+                    try: opt_idx = options.index(val)
+                    except: opt_idx = 0
                     updated_values[col] = st.selectbox(col, options, index=opt_idx)
 
-                # Các trường nhập liệu bình thường
+                # --- TRƯỜNG HỢP ĐỊA CHỈ (CÓ GỢI Ý) ---
+                elif "Địa chỉ chi tiết" in col:
+                    # Hiển thị label
+                    st.markdown(f"**{col}**") 
+                    
+                    # Ô nhập liệu
+                    updated_values[col] = st.text_input(
+                        col, 
+                        value=str(val), 
+                        label_visibility="collapsed", # Ẩn label mặc định để dùng markdown phía trên cho đẹp
+                        placeholder="Ví dụ: Thôn Hòa Bình Hạ, Xã Văn Giang, Tỉnh Hưng Yên"
+                    )
+                    # Dòng gợi ý màu xám bên dưới
+                    st.caption("💡 *Định dạng mẫu: Thôn/Xóm/Số nhà/Tổ, Xã/Phường, Quận/Huyện, Tỉnh/TP*")
+                
+                # --- CÁC TRƯỜNG KHÁC ---
                 else:
                     updated_values[col] = st.text_input(col, value=str(val))
 
@@ -319,3 +354,4 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
