@@ -203,7 +203,7 @@ if app_mode == "👤 Cập nhật thông tin":
                 # --- TRƯỜNG HỢP ĐỊA CHỈ (CÓ GỢI Ý) ---
                 elif "Địa chỉ chi tiết" in col:
                     # Hiển thị label
-                    st.markdown(f"**{col}**") 
+                    st.markdown(f"{col}") 
                     
                     # Ô nhập liệu
                     updated_values[col] = st.text_input(
@@ -213,7 +213,7 @@ if app_mode == "👤 Cập nhật thông tin":
                         placeholder="Ví dụ: Thôn Hòa Bình Hạ, Xã Văn Giang, Tỉnh Hưng Yên"
                     )
                     # Dòng gợi ý màu xám bên dưới
-                    st.caption("💡 *Định dạng mẫu: Thôn/Xóm/Số nhà/Tổ, Xã/Phường, Quận/Huyện, Tỉnh/TP*")
+                    st.caption("💡 *Định dạng mẫu: Thôn/Xóm/Số nhà/Tổ, Xã/Phường*")
                 
                 # --- CÁC TRƯỜNG KHÁC ---
                 else:
@@ -354,4 +354,5 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
