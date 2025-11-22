@@ -225,7 +225,10 @@ if app_mode == "👤 Cập nhật thông tin":
                 'Số thẻ Đảng* (12 số theo HD38-HD/BTCTW)',
                 'Ngày cấp thẻ Đảng (dd/mm/yyyy)',
                 'Số thẻ theo Đảng quyết định 85',
-                'Ngày vào Đảng chính thức* (dd/mm/yyyy)' 
+                'Ngày vào Đảng chính thức* (dd/mm/yyyy)',
+                'Nơi cấp thẻ Đảng',           
+                'Số CMND cũ (nếu có)',       
+                'Tên gọi khác'
             ]
             
             for col in ALL_COLUMNS:
@@ -482,6 +485,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
