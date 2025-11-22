@@ -173,40 +173,98 @@ if app_mode == "👤 Cập nhật thông tin":
     if 'selected_row_index' not in st.session_state:
         st.session_state.selected_row_index = None
 
-    # --- BƯỚC 1: TÌM KIẾM ---
+# --- STEP 1: SEARCH ---
     if st.session_state.step == 1:
         st.subheader("Bước 1: Tra cứu thông tin")
-        with st.form("search_form"):
-            col_s1, col_s2 = st.columns(2)
-            with col_s1:
-                search_name = st.text_input("Họ và tên (đầy đủ có dấu):")
-            with col_s2:
-                search_dob = st.text_input("Ngày sinh (dd/mm/yyyy):", placeholder="Ví dụ: 05/01/2005")
+        
+        # Initialize search mode state if not present
+        if 'search_mode' not in st.session_state:
+            st.session_state.search_mode = 'id'  # Default to ID search
+
+        # --- MODE 1: SEARCH BY ID (Preferred) ---
+        if st.session_state.search_mode == 'id':
+            with st.form("search_id_form"):
+                st.markdown("#### 🔍 Tra cứu bằng Số định danh cá nhân (CCCD/ĐDCN)")
+                search_id = st.text_input("Nhập Số định danh cá nhân (12 số):", placeholder="Ví dụ: 030098123456")
+                submitted_id = st.form_submit_button("Tra cứu ngay", type="primary")
+
+                if submitted_id:
+                    if not search_id:
+                        st.warning("Vui lòng nhập Số định danh cá nhân.")
+                    else:
+                        with st.spinner("Đang tìm kiếm theo số định danh..."):
+                            df, _, _ = load_data_main()
+                            
+                            # Normalize input and data for comparison (remove spaces, ensure string)
+                            clean_input_id = search_id.strip()
+                            
+                            # Ensure the column is treated as string for comparison
+                            # Note: 'Số định danh cá nhân *' is the exact column name
+                            mask = df['Số định danh cá nhân *'].astype(str).str.strip() == clean_input_id
+                            results = df[mask]
+
+                            if not results.empty:
+                                st.success(f"✅ Tìm thấy thông tin của: {results.iloc[0]['Họ và tên *']}")
+                                st.session_state.search_results = results
+                                st.session_state.step = 2
+                                st.rerun()
+                            else:
+                                st.error(f"❌ Không tìm thấy số định danh: {clean_input_id}")
+                                # Enable fallback option
+                                st.session_state.show_name_search_option = True
+
+            # Show button to switch to Name search if ID search fails or user wants to switch
+            if st.session_state.get('show_name_search_option', False):
+                st.info("Không tìm thấy? Có thể số định danh chưa được cập nhật chính xác.")
+                if st.button("👉 Thử tìm bằng Họ Tên và Ngày Sinh"):
+                    st.session_state.search_mode = 'name'
+                    st.rerun()
             
-            submitted = st.form_submit_button("Tra cứu", type="primary")
+            # Optional: Link to switch mode manually if they don't have ID handy
+            elif st.button("Chuyển sang tìm bằng Họ Tên & Ngày Sinh"):
+                st.session_state.search_mode = 'name'
+                st.rerun()
 
-            if submitted:
-                if not search_name or not search_dob:
-                    st.warning("Vui lòng nhập đầy đủ Họ tên và Ngày sinh.")
-                else:
-                    with st.spinner("Đang tìm kiếm..."):
-                        df, _, _ = load_data_main()
-                        # Lọc dữ liệu (Case insensitive)
-                        mask = (
-                            df['Họ và tên *'].str.strip().str.lower() == search_name.strip().lower()
-                        ) & (
-                            df['Sinh ngày * (dd/mm/yyyy)'] == search_dob.strip()
-                        )
-                        results = df[mask]
+        # --- MODE 2: SEARCH BY NAME & DOB (Fallback) ---
+        elif st.session_state.search_mode == 'name':
+            with st.form("search_name_form"):
+                st.markdown("#### 👤 Tra cứu bằng Họ Tên và Ngày Sinh")
+                col_s1, col_s2 = st.columns(2)
+                with col_s1:
+                    search_name = st.text_input("Họ và tên (đầy đủ có dấu):")
+                with col_s2:
+                    search_dob = st.text_input("Ngày sinh (dd/mm/yyyy):", placeholder="Ví dụ: 05/01/2005")
+                
+                submitted_name = st.form_submit_button("Tra cứu", type="primary")
 
-                        if results.empty:
-                            st.error("❌ Không tìm thấy thông tin hoặc bạn không thuộc diện cần cập nhật.")
-                            st.info("Lưu ý: Kiểm tra kỹ chính tả và định dạng ngày sinh (dd/mm/yyyy).")
-                        else:
-                            st.success(f"Tìm thấy {len(results)} kết quả.")
-                            st.session_state.search_results = results
-                            st.session_state.step = 2
-                            st.rerun()
+                if submitted_name:
+                    if not search_name or not search_dob:
+                        st.warning("Vui lòng nhập đầy đủ Họ tên và Ngày sinh.")
+                    else:
+                        with st.spinner("Đang tìm kiếm..."):
+                            df, _, _ = load_data_main()
+                            # Case-insensitive search
+                            mask = (
+                                df['Họ và tên *'].str.strip().str.lower() == search_name.strip().lower()
+                            ) & (
+                                df['Sinh ngày * (dd/mm/yyyy)'] == search_dob.strip()
+                            )
+                            results = df[mask]
+
+                            if results.empty:
+                                st.error("❌ Không tìm thấy thông tin.")
+                                st.info("Lưu ý: Kiểm tra kỹ chính tả tiếng Việt và định dạng ngày (dd/mm/yyyy).")
+                            else:
+                                st.success(f"Tìm thấy {len(results)} kết quả.")
+                                st.session_state.search_results = results
+                                st.session_state.step = 2
+                                st.rerun()
+            
+            # Button to go back to ID search
+            if st.button("⬅️ Quay lại tìm bằng Số định danh"):
+                st.session_state.search_mode = 'id'
+                st.session_state.show_name_search_option = False
+                st.rerun()
 
     # --- BƯỚC 2: CHỌN NGƯỜI ---
     elif st.session_state.step == 2:
@@ -268,13 +326,13 @@ if app_mode == "👤 Cập nhật thông tin":
                 # --- HEADER PHÂN VÙNG ---
                 if col == 'Nơi đăng ký khai sinh - Quốc gia *':
                     st.markdown("---") 
-                    st.subheader("1. THÔNG TIN KHAI SINH")
+                    st.subheader("🏠 THÔNG TIN KHAI SINH")
                 elif col == 'Quê quán (theo mô hình 2 cấp) - Quốc gia *':
                     st.markdown("---")
-                    st.subheader("2. THÔNG TIN QUÊ QUÁN")
+                    st.subheader("🏠 THÔNG TIN QUÊ QUÁN")
                 elif col == 'Thường trú (theo mô hình 2 cấp) - Quốc gia *':
                     st.markdown("---")
-                    st.subheader("3. THÔNG TIN THƯỜNG TRÚ")
+                    st.subheader("🏠 THÔNG TIN THƯỜNG TRÚ")
 
                 val = current_data.get(col, "")
                 
@@ -374,7 +432,7 @@ if app_mode == "👤 Cập nhật thông tin":
                         st.text_input(display_label, value=val, disabled=True, key=col)
                         updated_values[col] = str(val)
                     elif col == 'Trạng thái hoạt động':
-                        opts = ["Đang sinh hoạt Đảng", "Đã chuyển sinh hoạt", "Đã từ trần", "Đã ra khỏi Đảng"]
+                        opts = ["Đang sinh hoạt Đảng", "Đã chuyển sinh hoạt"]
                         idx_opt = opts.index(val) if val in opts else 0
                         updated_values[col] = st.selectbox(display_label, opts, index=idx_opt, key=col)
                     elif col == 'Giới tính *':
@@ -564,6 +622,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
