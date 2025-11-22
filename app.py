@@ -296,7 +296,7 @@ if app_mode == "👤 Cập nhật thông tin":
     elif st.session_state.step == 3:
         st.subheader("Bước 3: Cập nhật thông tin chi tiết")
         
-        # 1. Load Data Địa chính (JSON)
+        # 1. Load Data Địa chính
         import json
         @st.cache_data
         def load_location_data():
@@ -328,35 +328,23 @@ if app_mode == "👤 Cập nhật thông tin":
             'Nơi cấp thẻ Đảng', 'Số CMND cũ (nếu có)', 'Tên gọi khác'
         ]
 
-        # --- BẮT ĐẦU VÒNG LẶP ---
+        # --- BẮT ĐẦU VÒNG LẶP HIỂN THỊ FORM ---
         for col in ALL_COLUMNS:
             if col in TEMP_COLS: continue
             
             val = current_data.get(col, "")
 
             # ========================================================
-            # 1. KHAI SINH (Logic: Chọn Nga -> Tự điền KHÔNG)
+            # 1. KHAI SINH
             # ========================================================
             if col == 'Nơi đăng ký khai sinh - Quốc gia *':
                 st.markdown("---"); st.subheader("1. THÔNG TIN KHAI SINH")
-                
-                # Check xem dữ liệu cũ có phải Nga không
                 is_russia = str(val).strip().upper() in ["LIÊN BANG NGA", "NGA", "RUSSIA"]
-                
-                # Radio chọn quốc gia (Key: ks_qg)
-                ks_quocgia = st.radio(
-                    "Quốc gia *", 
-                    ["Việt Nam", "Liên Bang Nga"], 
-                    index=1 if is_russia else 0, 
-                    horizontal=True, 
-                    key="ks_qg"
-                )
+                ks_quocgia = st.radio("Quốc gia *", ["Việt Nam", "Liên Bang Nga"], index=1 if is_russia else 0, horizontal=True, key="ks_qg")
                 updated_values[col] = ks_quocgia
 
             elif col == 'Nơi đăng ký khai sinh - Tỉnh *':
-                # Lấy giá trị từ Radio Button trên
                 cur_qg = st.session_state.get("ks_qg", "Việt Nam")
-                
                 if cur_qg == "Liên Bang Nga":
                     st.text_input("Tỉnh *", value="KHÔNG", disabled=True, key="ks_tinh_nga")
                     updated_values[col] = "KHÔNG"
@@ -368,23 +356,19 @@ if app_mode == "👤 Cập nhật thông tin":
 
             elif col == 'Nơi đăng ký khai sinh - Địa chỉ chi tiết *':
                 cur_qg = st.session_state.get("ks_qg", "Việt Nam")
-                
                 if cur_qg == "Liên Bang Nga":
                     c1, c2 = st.columns(2)
                     with c1: st.text_input("Xã/Phường/ Đặc khu *", value="KHÔNG", disabled=True, key="ks_xa_nga")
                     with c2: st.text_input("Địa chỉ chi tiết (Thôn/Tổ...)*", value="KHÔNG", disabled=True, key="ks_thon_nga")
-                    
                     updated_values['Temp_XaPhuong_KhaiSinh'] = "KHÔNG"
                     updated_values['Temp_ThonTo_KhaiSinh'] = "KHÔNG"
                     updated_values[col] = "KHÔNG"
                 else:
-                    # Lấy Tỉnh để lọc Xã
                     cur_tinh = st.session_state.get("ks_tinh_vn", list_tinh[0] if list_tinh else "")
                     list_xa = vn_locations.get(cur_tinh, [])
                     
                     val_xa = current_data.get('Temp_XaPhuong_KhaiSinh', '')
                     val_thon = current_data.get('Temp_ThonTo_KhaiSinh', '')
-                    # Logic tách chuỗi cũ nếu Temp rỗng
                     if not val_xa and str(val):
                         parts = str(val).split(',')
                         if len(parts) >= 2: val_xa = parts[-1].strip(); val_thon = ",".join(parts[:-1]).strip()
@@ -402,7 +386,7 @@ if app_mode == "👤 Cập nhật thông tin":
                     updated_values[col] = f"{input_thon}, {input_xa}".strip(", ")
 
             # ========================================================
-            # 2. QUÊ QUÁN (Fix Việt Nam)
+            # 2. QUÊ QUÁN
             # ========================================================
             elif col == 'Quê quán (theo mô hình 2 cấp) - Quốc gia *':
                 st.markdown("---"); st.subheader("2. THÔNG TIN QUÊ QUÁN")
@@ -418,14 +402,13 @@ if app_mode == "👤 Cập nhật thông tin":
             elif col == 'Quê quán (theo mô hình 2 cấp) - Địa chỉ chi tiết *':
                 cur_tinh = st.session_state.get("qq_tinh", "")
                 list_xa = vn_locations.get(cur_tinh, [])
-                
                 try: idx = list_xa.index(str(val))
                 except: idx = 0
                 qq_xa = st.selectbox("Xã/Phường/ Đặc khu *", list_xa, index=idx, key="qq_xa")
                 updated_values[col] = qq_xa
 
             # ========================================================
-            # 3. THƯỜNG TRÚ (Fix Việt Nam)
+            # 3. THƯỜNG TRÚ
             # ========================================================
             elif col == 'Thường trú (theo mô hình 2 cấp) - Quốc gia *':
                 st.markdown("---"); st.subheader("3. THÔNG TIN THƯỜNG TRÚ")
@@ -461,22 +444,15 @@ if app_mode == "👤 Cập nhật thông tin":
                 updated_values[col] = f"{tt_thon}, {tt_xa}".strip(", ")
 
             # ========================================================
-            # CÁC TRƯỜNG KHÁC (Rút gọn tên hiển thị)
+            # CÁC TRƯỜNG KHÁC
             # ========================================================
             else:
                 clean_label = col
-                # Xóa các tiền tố dài dòng
-                prefixes = [
-                    "Nơi đăng ký khai sinh - ", 
-                    "Quê quán (theo mô hình 2 cấp) - ", 
-                    "Thường trú (theo mô hình 2 cấp) - "
-                ]
-                for p in prefixes: clean_label = clean_label.replace(p, "")
+                for p in ["Nơi đăng ký khai sinh - ", "Quê quán (theo mô hình 2 cấp) - ", "Thường trú (theo mô hình 2 cấp) - "]:
+                    clean_label = clean_label.replace(p, "")
                 
-                if col in OPTIONAL_COLS:
-                    clean_label = clean_label.replace('*', '') + " (Không bắt buộc)"
+                if col in OPTIONAL_COLS: clean_label = clean_label.replace('*', '') + " (Không bắt buộc)"
 
-                # Widget
                 if col in READ_ONLY_COLS:
                     st.text_input(clean_label, value=val, disabled=True, key=col)
                     updated_values[col] = str(val)
@@ -494,37 +470,54 @@ if app_mode == "👤 Cập nhật thông tin":
 
         st.write("---")
         
-        # --- NÚT LƯU VÀ VALIDATION ---
+        # --- NÚT LƯU VÀ VALIDATION (NÂNG CẤP CHECK RIÊNG LẺ) ---
         if st.button("💾 LƯU THÔNG TIN", type="primary", use_container_width=True):
             
-            REQUIRE_COLUMNS = [
+            missing_fields = []
+
+            # 1. CHECK KHAI SINH (Kiểm tra kỹ từng thành phần)
+            if updated_values.get('Nơi đăng ký khai sinh - Quốc gia *') == "Việt Nam":
+                if not updated_values.get('Nơi đăng ký khai sinh - Tỉnh *'): 
+                    missing_fields.append("Khai sinh: Chưa chọn Tỉnh")
+                # Check Xã (Temp)
+                if not str(updated_values.get('Temp_XaPhuong_KhaiSinh', '')).strip(): 
+                    missing_fields.append("Khai sinh: Chưa chọn Xã/Phường")
+                # Check Thôn (Temp)
+                if not str(updated_values.get('Temp_ThonTo_KhaiSinh', '')).strip(): 
+                    missing_fields.append("Khai sinh: Chưa nhập Thôn/Tổ/Số nhà")
+
+            # 2. CHECK QUÊ QUÁN
+            if updated_values.get('Quê quán (theo mô hình 2 cấp) - Quốc gia *') == "Việt Nam":
+                if not updated_values.get('Quê quán (theo mô hình 2 cấp) - Tỉnh *'): 
+                    missing_fields.append("Quê quán: Chưa chọn Tỉnh")
+                # Quê quán chỉ cần Xã (check trực tiếp giá trị cột chính vì không có cột Temp riêng cho Xã Quê Quán trong logic cũ)
+                if not str(updated_values.get('Quê quán (theo mô hình 2 cấp) - Địa chỉ chi tiết *', '')).strip():
+                    missing_fields.append("Quê quán: Chưa chọn Xã/Phường")
+
+            # 3. CHECK THƯỜNG TRÚ
+            if updated_values.get('Thường trú (theo mô hình 2 cấp) - Quốc gia *') == "Việt Nam":
+                if not updated_values.get('Thường trú (theo mô hình 2 cấp) - Tỉnh *'): 
+                    missing_fields.append("Thường trú: Chưa chọn Tỉnh")
+                if not str(updated_values.get('Temp_XaPhuong_ThuongTru', '')).strip(): 
+                    missing_fields.append("Thường trú: Chưa chọn Xã/Phường")
+                if not str(updated_values.get('Temp_ThonTo_ThuongTru', '')).strip(): 
+                    missing_fields.append("Thường trú: Chưa nhập Thôn/Tổ/Số nhà")
+
+            # 4. CHECK CÁC TRƯỜNG CÒN LẠI (Dùng danh sách REQUIRE cũ)
+            OTHER_REQUIRE = [
                 'STT', 'ID', 'Họ và tên *', 'Giới tính *', 'Sinh ngày * (dd/mm/yyyy)',
-                'Dân tộc *', 'Tôn giáo *', 'Số định danh cá nhân *',
-                'Nơi đăng ký khai sinh - Quốc gia *', 'Nơi đăng ký khai sinh - Tỉnh *', 
-                'Nơi đăng ký khai sinh - Địa chỉ chi tiết *', 
-                'Quê quán (theo mô hình 2 cấp) - Quốc gia *', 'Quê quán (theo mô hình 2 cấp) - Tỉnh *',
-                'Quê quán (theo mô hình 2 cấp) - Địa chỉ chi tiết *', 
-                'Thường trú (theo mô hình 2 cấp) - Quốc gia *', 'Thường trú (theo mô hình 2 cấp) - Tỉnh *', 
-                'Thường trú (theo mô hình 2 cấp) - Địa chỉ chi tiết *', 
+                'Dân tộc *', 'Tôn giáo *', 'Số định danh cá nhân *', 
                 'Ngày vào Đảng* (dd/mm/yyyy)', 'Trạng thái hoạt động'
             ]
-
-            missing_fields = []
-            for col_req in REQUIRE_COLUMNS:
-                final_val = str(updated_values.get(col_req, "")).strip()
-                
-                # Validation Logic: Nếu rỗng hoặc gộp lỗi
-                # (Lưu ý: "KHÔNG, KHÔNG" hoặc "KHÔNG" là hợp lệ nếu chọn Nga)
-                if not final_val or final_val == ",":
-                    clean_name = col_req.replace('*', '')
-                    if "Khai sinh" in col_req: clean_name = "Khai sinh: Chưa đủ thông tin (Tỉnh/Xã/Chi tiết)"
-                    elif "Quê quán" in col_req: clean_name = "Quê quán: Chưa đủ thông tin (Tỉnh/Xã)"
-                    elif "Thường trú" in col_req: clean_name = "Thường trú: Chưa đủ thông tin (Tỉnh/Xã/Chi tiết)"
-                    
-                    missing_fields.append(clean_name)
             
+            for col_req in OTHER_REQUIRE:
+                val_check = str(updated_values.get(col_req, "")).strip()
+                if not val_check:
+                    missing_fields.append(col_req.replace('*', ''))
+
+            # --- XỬ LÝ KẾT QUẢ CHECK ---
             if missing_fields:
-                st.error("⚠️ KHÔNG THỂ LƯU! Vui lòng điền đầy đủ:", icon="🚫")
+                st.error("⚠️ KHÔNG THỂ LƯU! Vui lòng điền đầy đủ các thông tin sau:", icon="🚫")
                 for f in missing_fields: st.markdown(f"- **{f}**")
             else:
                 with st.spinner("Đang lưu dữ liệu..."):
@@ -670,6 +663,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
