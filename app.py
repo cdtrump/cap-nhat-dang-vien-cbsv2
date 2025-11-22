@@ -457,7 +457,7 @@ if app_mode == "👤 Cập nhật thông tin":
                     st.text_input(clean_label, value=val, disabled=True, key=col)
                     updated_values[col] = str(val)
                 elif col == 'Trạng thái hoạt động':
-                    opts = ["Đang sinh hoạt Đảng", "Đã chuyển sinh hoạt", "Đã từ trần", "Đã ra khỏi Đảng"]
+                    opts = ["Đang sinh hoạt Đảng", "Đã chuyển sinh hoạt"]
                     idx = opts.index(val) if val in opts else 0
                     updated_values[col] = st.selectbox(clean_label, opts, index=idx, key=col)
                 elif col == 'Giới tính *':
@@ -663,6 +663,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
