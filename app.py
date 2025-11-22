@@ -336,7 +336,7 @@ if app_mode == "👤 Cập nhật thông tin":
                 else:
                     display_label = col
                     if col in OPTIONAL_COLS:
-                        display_label = col.replace('*', '')"
+                        display_label = col.replace('*', '')
                     
                     if col in READ_ONLY_COLS:
                         st.text_input(display_label, value=val, disabled=True)
@@ -533,6 +533,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
