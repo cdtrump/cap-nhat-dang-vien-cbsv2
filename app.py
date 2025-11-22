@@ -88,7 +88,7 @@ app_mode = st.sidebar.radio("Chọn chức năng:", ["👤 Cập nhật thông t
 # CHẾ ĐỘ 1: NGƯỜI DÙNG CẬP NHẬT
 # =========================================================
 if app_mode == "👤 Cập nhật thông tin":
-    st.title("📝 Cập nhật thông tin Đảng viên")
+    st.title("📝 Cập nhật thông tin Đảng viên CBSV II -NEU")
     
     # Khởi tạo state nếu chưa có
     if 'step' not in st.session_state:
@@ -354,6 +354,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
