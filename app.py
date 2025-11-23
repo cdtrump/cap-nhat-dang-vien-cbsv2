@@ -4,9 +4,12 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 import io
+import time
+from functools import wraps
 
 # --- CẤU HÌNH ---
 ADMIN_PASSWORD = st.secrets["admin_password"]
+CACHE_TTL = 30  
 
 
 # --- CẤU HÌNH ---
@@ -78,7 +81,103 @@ def connect_to_workbook():
     client = gspread.authorize(creds)
     return client.open("DanhSachDangVien")
 
-# --- Thêm 2 hàm này vào code của bạn ---
+# ========================================
+# 🔥 GIẢI PHÁP AUTO-RETRY KHI GẶP LỖI 429
+# ========================================
+
+def retry_on_rate_limit(max_retries=5, initial_wait=2):
+    """Decorator tự động retry khi gặp lỗi 429 (Rate Limit)"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            wait_time = initial_wait
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except gspread.exceptions.APIError as e:
+                    if e.response.status_code == 429:
+                        if attempt < max_retries - 1:
+                            with st.spinner(f"⏳ Hệ thống đang bận, chờ {wait_time}s... (Lần {attempt + 1}/{max_retries})"):
+                                time.sleep(wait_time)
+                            wait_time *= 2
+                        else:
+                            st.error("❌ Hệ thống quá tải. Vui lòng thử lại sau 1 phút.")
+                            raise
+                    else:
+                        raise
+                except Exception as e:
+                    st.error(f"⚠️ Lỗi không xác định: {str(e)}")
+                    raise
+            return None
+        return wrapper
+    return decorator
+
+# --- CÁC HÀM WRAPPER AN TOÀN ---
+
+@retry_on_rate_limit()
+def safe_get_all_records(sheet, expected_headers):
+    return sheet.get_all_records(expected_headers=expected_headers)
+
+@retry_on_rate_limit()
+def safe_update_sheet(sheet, cell_range, values):
+    return sheet.update(cell_range, values, value_input_option='USER_ENTERED')
+
+@retry_on_rate_limit()
+def safe_append_row(sheet, row_data):
+    return sheet.append_row(row_data, value_input_option='USER_ENTERED')
+
+@retry_on_rate_limit()
+def safe_get_all_values(sheet):
+    return sheet.get_all_values()
+
+# ========================================
+# ✅ CACHING & STATE MANAGEMENT (1 PHÚT)
+# ========================================
+
+@st.cache_data(ttl=CACHE_TTL)
+def load_data_main_cached(_sheet):
+    """Load data có cache 1 phút, xử lý số 0 ở đầu"""
+    data = safe_get_all_records(_sheet, ALL_COLUMNS)
+    df = pd.DataFrame(data)
+    
+    # Xử lý số 0 ở đầu (Logic cũ nhưng đưa vào cache)
+    cols_need_zero = ['Số định danh cá nhân *', 'Số thẻ Đảng* (12 số theo HD38-HD/BTCTW)', 'Số CMND cũ (nếu có)']
+    for col in cols_need_zero:
+        if col in df.columns:
+            df[col] = df[col].astype(str).replace(r'\.0$', '', regex=True).replace(['nan', 'None', ''], '')
+            df[col] = df[col].apply(lambda x: x.zfill(12) if x.strip() != '' and x.isdigit() else x)
+            
+    df['ID'] = df['ID'].astype(str).replace(r'\.0$', '', regex=True)
+    return df
+
+def init_session_data():
+    """Khởi tạo session state nếu chưa có"""
+    if 'data_loaded' not in st.session_state:
+        with st.spinner("🔄 Đang tải dữ liệu..."):
+            workbook = connect_to_workbook()
+            sheet = workbook.worksheet(SHEET_NAME_MAIN)
+            df = load_data_main_cached(sheet)
+            
+            st.session_state.df_main = df
+            st.session_state.main_sheet = sheet
+            st.session_state.workbook = workbook
+            st.session_state.data_loaded = True
+            st.session_state.last_load_time = time.time()
+
+def get_session_data():
+    """Hàm duy nhất để lấy dữ liệu trong app"""
+    init_session_data()
+    return st.session_state.df_main, st.session_state.main_sheet, st.session_state.workbook
+
+def force_refresh_data():
+    """Admin dùng để xóa cache và tải lại ngay lập tức"""
+    st.cache_data.clear()
+    for key in ['data_loaded', 'df_main', 'main_sheet', 'workbook', 'last_load_time']:
+        if key in st.session_state:
+            del st.session_state[key]
+    init_session_data()
+
+# ---  ---
 
 def normalize_province_name(name):
     """
@@ -118,39 +217,28 @@ def find_province_index(province_from_sheet, all_provinces_list):
             
     return 0 # Không tìm thấy, trả về index đầu tiên
     
-def load_data_main():
-    workbook = connect_to_workbook()
-    sheet = workbook.worksheet(SHEET_NAME_MAIN)
-    
-    # Lấy toàn bộ giá trị dưới dạng chuỗi (để tránh Google tự convert sang số)
-    # Tuy nhiên get_all_records đôi khi vẫn tự convert, nên ta cần xử lý kỹ ở bước DataFrame
-    data = sheet.get_all_records(expected_headers=ALL_COLUMNS)
-    df = pd.DataFrame(data)
-    
-    # --- XỬ LÝ SỐ 0 Ở ĐẦU ---
-    # Danh sách các cột cần đảm bảo là chuỗi và có số 0
-    cols_need_zero = [
-        'Số định danh cá nhân *', 
-        'Số thẻ Đảng* (12 số theo HD38-HD/BTCTW)',
-        'Số CMND cũ (nếu có)'
-    ]
-    
-    for col in cols_need_zero:
-        if col in df.columns:
-            # Bước 1: Ép về kiểu chuỗi, xử lý lỗi .0 (ví dụ 123.0 -> 123)
-            df[col] = df[col].astype(str).replace(r'\.0$', '', regex=True)
-            
-            # Bước 2: Thay thế 'nan' hoặc chuỗi rỗng bằng ''
-            df[col] = df[col].replace(['nan', 'None', ''], '')
-            
-            # Bước 3: Nếu có dữ liệu (khác rỗng), thêm số 0 vào đầu cho đủ 12 ký tự
-            # Lưu ý: Chỉ fill nếu nó là chuỗi số. Nếu đang trống thì giữ nguyên.
-            df[col] = df[col].apply(lambda x: x.zfill(12) if x.strip() != '' and x.isdigit() else x)
+def save_update_optimized(sheet, row_index, updated_values, workbook):
+    try:
+        row_vals = [updated_values.get(c, "") for c in ALL_COLUMNS]
+        
+        # 1. Backup (An toàn)
+        try:
+            backup_sheet = workbook.worksheet(SHEET_NAME_BACKUP)
+            safe_append_row(backup_sheet, [datetime.now().strftime("%Y-%m-%d %H:%M:%S")] + row_vals)
+        except: pass
+        
+        # 2. Update (Dùng wrapper an toàn, row_index + 2 vì header + 1-based index)
+        safe_update_sheet(sheet, f"A{row_index + 2}", [row_vals])
+        
+        # 3. Dọn dẹp session (Chỉ xóa của user này để họ thấy data mới)
+        for key in ['data_loaded', 'df_main', 'main_sheet', 'workbook']:
+            if key in st.session_state:
+                del st.session_state[key]
+        return True
+    except Exception as e:
+        st.error(f"❌ Lỗi lưu dữ liệu: {str(e)}")
+        return False
 
-    # Ép kiểu ID về string để so sánh trong logic tìm kiếm
-    df['ID'] = df['ID'].astype(str).replace(r'\.0$', '', regex=True)
-    
-    return df, sheet, workbook
 
 # --- GIAO DIỆN CHÍNH ---
 st.set_page_config(page_title="Cập nhật thông tin Đảng viên CBSV II -NEU", layout="wide")
@@ -233,7 +321,7 @@ if app_mode == "👤 Cập nhật thông tin":
                         st.warning("Vui lòng nhập Số định danh cá nhân.")
                     else:
                         with st.spinner("Đang tìm kiếm theo số định danh..."):
-                            df, _, _ = load_data_main()
+                            df, _, _ = get_session_data()
                             
                             # Normalize input and data for comparison (remove spaces, ensure string)
                             clean_input_id = search_id.strip()
@@ -282,7 +370,7 @@ if app_mode == "👤 Cập nhật thông tin":
                         st.warning("Vui lòng nhập đầy đủ Họ tên và Ngày sinh.")
                     else:
                         with st.spinner("Đang tìm kiếm..."):
-                            df, _, _ = load_data_main()
+                            df, _, _ = get_session_data()
                             # Case-insensitive search
                             mask = (
                                 df['Họ và tên *'].str.strip().str.lower() == search_name.strip().lower()
@@ -349,7 +437,7 @@ if app_mode == "👤 Cập nhật thông tin":
         list_tinh = list(vn_locations.keys())
         
         # 2. Load Data User
-        df, main_sheet, workbook = load_data_main()
+        df, main_sheet, workbook = get_session_data()
         idx = st.session_state.selected_row_index
         
         try:
@@ -561,39 +649,12 @@ if app_mode == "👤 Cập nhật thông tin":
                 st.error("⚠️ KHÔNG THỂ LƯU! Vui lòng điền đầy đủ các thông tin sau:", icon="🚫")
                 for f in missing_fields: st.markdown(f"- **{f}**")
             else:
-                with st.spinner("Đang lưu dữ liệu..."):
-                    try:
-                        row_vals = [updated_values.get(c, "") for c in ALL_COLUMNS]
-                        
-                        # --- BACKUP (giữ nguyên) ---
-                        try:
-                            ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                            workbook.worksheet(SHEET_NAME_BACKUP).append_row([ts] + row_vals)
-                        except: 
-                            pass
-        
-                        # --- TÌM ĐÚNG DÒNG TRONG SHEET1 DỰA TRÊN ID ---
-                        user_id = str(updated_values.get('ID', '')).strip()
-                        
-                        # Lấy toàn bộ cột ID từ sheet (cột B = index 1)
-                        all_ids = main_sheet.col_values(2)  # Cột B (ID)
-                        
-                        # Tìm vị trí của ID trong sheet (bắt đầu từ 1)
-                        try:
-                            # +1 vì list index bắt đầu từ 0, nhưng sheet từ 1
-                            sheet_row = all_ids.index(user_id) + 1
-                            
-                            # Cập nhật đúng dòng
-                            main_sheet.update(f"A{sheet_row}", [row_vals])
-                            
-                            st.session_state.step = 4
-                            st.rerun()
-                            
-                        except ValueError:
-                            st.error(f"❌ Không tìm thấy ID {user_id} trong sheet!")
-                            
-                    except Exception as e: 
-                        st.error(f"Lỗi hệ thống: {e}")
+                with st.spinner("💾 Đang lưu dữ liệu..."):
+                    success = save_update_optimized(main_sheet, idx, updated_values, workbook)
+                    
+                    if success:
+                        st.session_state.step = 4
+                        st.rerun()
 
         if st.button("Hủy bỏ"):
             st.session_state.step = 2
@@ -626,6 +687,16 @@ if app_mode == "👤 Cập nhật thông tin":
 # CHẾ ĐỘ 2: ADMIN DASHBOARD
 # =========================================================
 elif app_mode == "📊 Admin Dashboard":
+    st.sidebar.divider()
+    st.sidebar.markdown("### 📊 Trạng thái dữ liệu")
+    if 'last_load_time' in st.session_state:
+        elapsed = int(time.time() - st.session_state.last_load_time)
+        mins, secs = divmod(elapsed, 60)
+        st.sidebar.caption(f"⏱️ Cache: {mins}p {secs}s trước (Tự làm mới sau 1p)")
+        if st.sidebar.button("🔄 Làm mới ngay"):
+            force_refresh_data()
+            st.rerun()
+
     st.title("📊 Thống kê Tiến độ Cập nhật")
     
     password = st.sidebar.text_input("Nhập mật khẩu Admin:", type="password")
@@ -633,11 +704,11 @@ elif app_mode == "📊 Admin Dashboard":
     if password == ADMIN_PASSWORD:
         with st.spinner("Đang tải dữ liệu thống kê..."):
             # Load dữ liệu mới nhất từ Sheet1
-            df_main, _, workbook = load_data_main()
+            df_main, _, workbook = get_session_data()
             
             try:
                 backup_sheet = workbook.worksheet(SHEET_NAME_BACKUP)
-                backup_rows = backup_sheet.get_all_values()
+                backup_rows = safe_get_all_values(backup_sheet)
                 if len(backup_rows) > 1:
                     updated_ids = set([str(row[2]).replace('.0', '') for row in backup_rows[1:] if len(row) > 2])
                 else:
@@ -725,43 +796,3 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
