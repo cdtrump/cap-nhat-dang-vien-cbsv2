@@ -687,21 +687,32 @@ if app_mode == "👤 Cập nhật thông tin":
 # CHẾ ĐỘ 2: ADMIN DASHBOARD
 # =========================================================
 elif app_mode == "📊 Admin Dashboard":
-    st.sidebar.divider()
-    st.sidebar.markdown("### 📊 Trạng thái dữ liệu")
-    if 'last_load_time' in st.session_state:
-        elapsed = int(time.time() - st.session_state.last_load_time)
-        mins, secs = divmod(elapsed, 60)
-        st.sidebar.caption(f"⏱️ Cache: {mins}p {secs}s trước (Tự làm mới sau 1p)")
-        if st.sidebar.button("🔄 Làm mới ngay"):
-            force_refresh_data()
-            st.rerun()
-
     st.title("📊 Thống kê Tiến độ Cập nhật")
     
+    # 1. Hiển thị ô nhập mật khẩu trước tiên
     password = st.sidebar.text_input("Nhập mật khẩu Admin:", type="password")
     
+    # 2. Chỉ khi đúng mật khẩu mới hiện các chức năng quản lý
     if password == ADMIN_PASSWORD:
+        
+        # --- KHU VỰC TRẠNG THÁI CACHE (Đã chuyển vào trong) ---
+        st.sidebar.divider()
+        st.sidebar.markdown("### 📊 Trạng thái dữ liệu")
+        
+        # Logic hiển thị trạng thái cache
+        if 'last_load_time' in st.session_state:
+            elapsed = int(time.time() - st.session_state.last_load_time)
+            mins, secs = divmod(elapsed, 60)
+            st.sidebar.caption(f"⏱️ Cache: {mins}p {secs}s trước (Tự làm mới sau 1p)")
+            
+            # Nút làm mới (Chỉ Admin mới bấm được)
+            if st.sidebar.button("🔄 Làm mới ngay"):
+                force_refresh_data()
+                st.rerun()
+        else:
+            st.sidebar.info("Dữ liệu đang được tải...")
+        # ------------------------------------------------------
+
         with st.spinner("Đang tải dữ liệu thống kê..."):
             # Load dữ liệu mới nhất từ Sheet1
             df_main, _, workbook = get_session_data()
@@ -736,7 +747,7 @@ elif app_mode == "📊 Admin Dashboard":
             # Lọc ra những người chưa cập nhật
             not_updated_df = df_main[~df_main['ID'].isin(updated_ids)].copy()
             
-            # Hiển thị trên web (Vẫn chỉ hiện ít cột cho gọn giao diện)
+            # Hiển thị trên web
             display_cols = ['ID', 'Họ và tên *', 'Sinh ngày * (dd/mm/yyyy)', 'Tổ chức Đảng đang sinh hoạt * (không sửa)']
             st.dataframe(
                 not_updated_df[display_cols],
@@ -744,24 +755,41 @@ elif app_mode == "📊 Admin Dashboard":
                 hide_index=True
             )
 
-            # --- XỬ LÝ XUẤT FILE EXCEL ĐẦY ĐỦ ---
+            # --- XỬ LÝ XUẤT FILE EXCEL ĐẦY ĐỦ (CẬP NHẬT: MASK THÁNG SINH & ÍT CỘT) ---
             # Tạo bộ nhớ đệm cho file Excel
             buffer_missing = io.BytesIO()
             
-            # Ghi toàn bộ dữ liệu (not_updated_df) ra Excel, không lọc cột
+            # 1. Chọn các cột cần xuất
+            export_cols = ['ID', 'Họ và tên *', 'Sinh ngày * (dd/mm/yyyy)']
+            # Tạo bản sao để không ảnh hưởng dữ liệu gốc
+            export_df = not_updated_df[export_cols].copy()
+
+            # 2. Hàm xử lý che tháng sinh (dd/mm/yyyy -> dd/**/yyyy)
+            def mask_month_date(val):
+                val = str(val).strip()
+                parts = val.split('/')
+                if len(parts) == 3:
+                    # parts[0]=ngày, parts[1]=tháng, parts[2]=năm
+                    return f"{parts[0]}/**/{parts[2]}"
+                return val
+
+            # 3. Áp dụng che tháng cho cột ngày sinh
+            export_df['Sinh ngày * (dd/mm/yyyy)'] = export_df['Sinh ngày * (dd/mm/yyyy)'].apply(mask_month_date)
+
+            # 4. Ghi ra Excel
             with pd.ExcelWriter(buffer_missing, engine='openpyxl') as writer:
-                not_updated_df.to_excel(writer, index=False, sheet_name='ChuaCapNhat')
+                export_df.to_excel(writer, index=False, sheet_name='ChuaCapNhat')
             
             # Đưa con trỏ về đầu file
             buffer_missing.seek(0)
             
             # Tên file kèm thời gian
-            file_name_missing = f"DS_ChuaCapNhat_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+            file_name_missing = f"DS_ChuaCapNhat_RUTGON_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
 
             col_dl1, col_dl2 = st.columns([1, 2])
             with col_dl1:
                 st.download_button(
-                    label="📥 Tải danh sách đầy đủ (.xlsx)",
+                    label="📥 Tải danh sách rút gọn (.xlsx)",
                     data=buffer_missing,
                     file_name=file_name_missing,
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -770,16 +798,13 @@ elif app_mode == "📊 Admin Dashboard":
 
             st.divider()
 
-            # --- PHẦN 2: TẢI FILE TỔNG HỢP (MỚI THÊM) ---
+            # --- PHẦN 2: TẢI FILE TỔNG HỢP ---
             st.subheader("🗄️ Xuất dữ liệu tổng hợp đầy đủ")
-            st.write("Tải về file Excel chứa toàn bộ dữ liệu mới nhất từ hệ thống (bao gồm cả những người đã cập nhật và chưa cập nhật).")
+            st.write("Tải về file Excel chứa toàn bộ dữ liệu mới nhất từ hệ thống.")
 
-            # Xử lý xuất file Excel trong bộ nhớ (RAM) mà không cần lưu ra ổ cứng
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
                 df_main.to_excel(writer, index=False, sheet_name='DanhSachTongHop')
-            
-            # Đưa con trỏ về đầu file để chuẩn bị tải
             buffer.seek(0)
 
             file_name_excel = f"TongHop_DangVien_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
@@ -794,5 +819,4 @@ elif app_mode == "📊 Admin Dashboard":
     elif password:
         st.error("Sai mật khẩu!")
     else:
-
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
