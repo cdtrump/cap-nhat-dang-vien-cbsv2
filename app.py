@@ -506,7 +506,7 @@ if app_mode == "👤 Cập nhật thông tin":
 
             # 4. CHECK CÁC TRƯỜNG CÒN LẠI (Dùng danh sách REQUIRE cũ)
             OTHER_REQUIRE = [
-                'STT', 'ID', 'Họ và tên *', 'Giới tính *', 'Sinh ngày * (dd/mm/yyyy)',
+                'Họ và tên *', 'Giới tính *', 'Sinh ngày * (dd/mm/yyyy)',
                 'Dân tộc *', 'Tôn giáo *', 'Số định danh cá nhân *', 
                 'Ngày vào Đảng* (dd/mm/yyyy)', 'Trạng thái hoạt động'
             ]
@@ -664,6 +664,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
