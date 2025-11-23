@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime
+from datetime import datetime, timedelta
 import io
 import time
 from functools import wraps
@@ -223,7 +223,8 @@ def save_update_optimized(sheet, row_index, updated_values, workbook):
         # 1. Backup (An toàn)
         try:
             backup_sheet = workbook.worksheet(SHEET_NAME_BACKUP)
-            safe_append_row(backup_sheet, [datetime.now().strftime("%Y-%m-%d %H:%M:%S")] + row_vals)
+            vn_time = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
+            safe_append_row(backup_sheet, [vn_time] + row_vals)
         except: pass
         
         # 2. Update (Dùng wrapper an toàn, row_index + 2 vì header + 1-based index)
@@ -794,7 +795,8 @@ elif app_mode == "📊 Admin Dashboard":
             buffer_missing.seek(0)
             
             # Tên file kèm thời gian
-            file_name_missing = f"DS_ChuaCapNhat_RUTGON_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+            vn_filename_time = (datetime.utcnow() + timedelta(hours=7)).strftime('%Y%m%d_%H%M')
+            file_name_missing = f"DS_ChuaCapNhat_RUTGON_{vn_filename_time}.xlsx"
 
             col_dl1, col_dl2 = st.columns([1, 2])
             with col_dl1:
@@ -817,7 +819,8 @@ elif app_mode == "📊 Admin Dashboard":
                 df_main.to_excel(writer, index=False, sheet_name='DanhSachTongHop')
             buffer.seek(0)
 
-            file_name_excel = f"TongHop_DangVien_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+            vn_filename_time = (datetime.utcnow() + timedelta(hours=7)).strftime('%Y%m%d_%H%M')
+            file_name_excel = f"TongHop_DangVien_{vn_filename_time}.xlsx"
 
             st.download_button(
                 label="📥 Tải trọn bộ dữ liệu (Excel .xlsx)",
@@ -830,3 +833,4 @@ elif app_mode == "📊 Admin Dashboard":
         st.error("Sai mật khẩu!")
     else:
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
