@@ -524,15 +524,36 @@ if app_mode == "👤 Cập nhật thông tin":
                 with st.spinner("Đang lưu dữ liệu..."):
                     try:
                         row_vals = [updated_values.get(c, "") for c in ALL_COLUMNS]
+                        
+                        # --- BACKUP (giữ nguyên) ---
                         try:
                             ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                             workbook.worksheet(SHEET_NAME_BACKUP).append_row([ts] + row_vals)
-                        except: pass
-
-                        main_sheet.update(f"A{idx + 2}", [row_vals])
-                        st.session_state.step = 4
-                        st.rerun()
-                    except Exception as e: st.error(f"Lỗi hệ thống: {e}")
+                        except: 
+                            pass
+        
+                        # --- TÌM ĐÚNG DÒNG TRONG SHEET1 DỰA TRÊN ID ---
+                        user_id = str(updated_values.get('ID', '')).strip()
+                        
+                        # Lấy toàn bộ cột ID từ sheet (cột B = index 1)
+                        all_ids = main_sheet.col_values(2)  # Cột B (ID)
+                        
+                        # Tìm vị trí của ID trong sheet (bắt đầu từ 1)
+                        try:
+                            # +1 vì list index bắt đầu từ 0, nhưng sheet từ 1
+                            sheet_row = all_ids.index(user_id) + 1
+                            
+                            # Cập nhật đúng dòng
+                            main_sheet.update(f"A{sheet_row}", [row_vals])
+                            
+                            st.session_state.step = 4
+                            st.rerun()
+                            
+                        except ValueError:
+                            st.error(f"❌ Không tìm thấy ID {user_id} trong sheet!")
+                            
+                    except Exception as e: 
+                        st.error(f"Lỗi hệ thống: {e}")
 
         if st.button("Hủy bỏ"):
             st.session_state.step = 2
@@ -664,6 +685,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
