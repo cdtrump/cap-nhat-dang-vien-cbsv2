@@ -78,6 +78,46 @@ def connect_to_workbook():
     client = gspread.authorize(creds)
     return client.open("DanhSachDangVien")
 
+# --- Thêm 2 hàm này vào code của bạn ---
+
+def normalize_province_name(name):
+    """
+    Chuẩn hóa tên tỉnh/thành phố để so sánh linh hoạt.
+    Ví dụ: "Thành phố Hải Phòng" -> "hải phòng"
+             "Hải Phòng" -> "hải phòng"
+             "Tỉnh Hà Giang" -> "hà giang"
+    """
+    if not isinstance(name, str):
+        return ""
+        
+    name = name.lower() # 1. Chuyển về chữ thường
+    
+    # 2. Loại bỏ các tiền tố phổ biến
+    prefixes_to_remove = ["thành phố ", "tp. ", "tp ", "tỉnh "]
+    for prefix in prefixes_to_remove:
+        if name.startswith(prefix):
+            name = name.replace(prefix, "", 1) # Chỉ thay thế 1 lần ở đầu
+            break
+            
+    return name.strip()
+
+def find_province_index(province_from_sheet, all_provinces_list):
+    """
+    Tìm chỉ mục (index) của một tỉnh trong danh sách một cách linh hoạt.
+    Trả về chỉ mục nếu tìm thấy, ngược lại trả về 0 (giá trị mặc định).
+    """
+    normalized_target = normalize_province_name(province_from_sheet)
+    
+    if not normalized_target:
+        return 0
+
+    for index, province_from_json in enumerate(all_provinces_list):
+        normalized_json_province = normalize_province_name(province_from_json)
+        if normalized_target == normalized_json_province:
+            return index
+            
+    return 0 # Không tìm thấy, trả về index đầu tiên
+    
 def load_data_main():
     workbook = connect_to_workbook()
     sheet = workbook.worksheet(SHEET_NAME_MAIN)
@@ -349,8 +389,8 @@ if app_mode == "👤 Cập nhật thông tin":
                     st.text_input("Tỉnh *", value="KHÔNG", disabled=True, key="ks_tinh_nga")
                     updated_values[col] = "KHÔNG"
                 else:
-                    try: idx = list_tinh.index(str(val))
-                    except: idx = 0
+                    # SỬA Ở ĐÂY: Dùng hàm tìm kiếm linh hoạt
+                    idx = find_province_index(str(val), list_tinh)
                     ks_tinh = st.selectbox("Tỉnh *", list_tinh, index=idx, key="ks_tinh_vn")
                     updated_values[col] = ks_tinh
 
@@ -394,8 +434,8 @@ if app_mode == "👤 Cập nhật thông tin":
                 updated_values[col] = "Việt Nam"
 
             elif col == 'Quê quán (theo mô hình 2 cấp) - Tỉnh *':
-                try: idx = list_tinh.index(str(val))
-                except: idx = 0
+                # SỬA Ở ĐÂY
+                idx = find_province_index(str(val), list_tinh)
                 qq_tinh = st.selectbox("Tỉnh *", list_tinh, index=idx, key="qq_tinh")
                 updated_values[col] = qq_tinh
 
@@ -416,8 +456,8 @@ if app_mode == "👤 Cập nhật thông tin":
                 updated_values[col] = "Việt Nam"
 
             elif col == 'Thường trú (theo mô hình 2 cấp) - Tỉnh *':
-                try: idx = list_tinh.index(str(val))
-                except: idx = 0
+                # SỬA Ở ĐÂY
+                idx = find_province_index(str(val), list_tinh)
                 tt_tinh = st.selectbox("Tỉnh *", list_tinh, index=idx, key="tt_tinh")
                 updated_values[col] = tt_tinh
 
@@ -685,6 +725,7 @@ elif app_mode == "📊 Admin Dashboard":
     else:
 
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
