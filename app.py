@@ -4,26 +4,18 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 import io
+import time
+from functools import wraps
 
 # --- CẤU HÌNH ---
 ADMIN_PASSWORD = st.secrets["admin_password"]
+CACHE_TTL = 300  # Cache 5 phút (300 giây)
 
-
-# --- CẤU HÌNH ---
-# Danh sách cột CHÍNH XÁC (33 cột)
 ALL_COLUMNS = [
-    'STT', 
-    'ID', 
-    'Họ và tên *', 
-    'Tên gọi khác', 
-    'Giới tính *', 
-    'Sinh ngày * (dd/mm/yyyy)',
-    'Dân tộc *', 
-    'Tôn giáo *', 
-    'Số định danh cá nhân *', 
-    'Số thẻ Đảng* (12 số theo HD38-HD/BTCTW)',
-    'Nơi cấp thẻ Đảng', 
-    'Ngày cấp thẻ Đảng (dd/mm/yyyy)', 
+    'STT', 'ID', 'Họ và tên *', 'Tên gọi khác', 'Giới tính *', 
+    'Sinh ngày * (dd/mm/yyyy)', 'Dân tộc *', 'Tôn giáo *', 
+    'Số định danh cá nhân *', 'Số thẻ Đảng* (12 số theo HD38-HD/BTCTW)',
+    'Nơi cấp thẻ Đảng', 'Ngày cấp thẻ Đảng (dd/mm/yyyy)', 
     'Số thẻ theo Đảng quyết định 85',
     'Tổ chức Đảng đang sinh hoạt * (không sửa)', 
     'Nơi đăng ký khai sinh - Quốc gia *',
@@ -40,55 +32,134 @@ ALL_COLUMNS = [
     'Số CMND cũ (nếu có)',
     'Trạng thái hoạt động', 
     'Ngày rời khỏi/ Ngày mất/ Ngày miễn sinh hoạt Đảng (dd/mm/yyyy)',
-    
-    # --- CỘT NÀY QUAN TRỌNG: Cần giữ lại để giữ chỗ, dù không dùng ---
-    'Đề nghị xóa (do đang viên không thuộc chi bộ)/ (Nếu muốn xóa chọn "có", còn không bỏ qua)',
-    
-    # --- 4 CỘT PHỤ MỚI THÊM ---
-    'Temp_XaPhuong_KhaiSinh', 
-    'Temp_ThonTo_KhaiSinh', 
-    'Temp_XaPhuong_ThuongTru', 
-    'Temp_ThonTo_ThuongTru'
+    'Đề nghị xóa (do đảng viên không thuộc chi bộ)/ (Nếu muốn xóa chọn "có", còn không bỏ qua)',
+    'Temp_XaPhuong_KhaiSinh', 'Temp_ThonTo_KhaiSinh', 
+    'Temp_XaPhuong_ThuongTru', 'Temp_ThonTo_ThuongTru'
 ]
 
-# Danh sách cột phụ
-TEMP_COLS = ['Temp_XaPhuong_KhaiSinh', 'Temp_ThonTo_KhaiSinh', 'Temp_XaPhuong_ThuongTru', 'Temp_ThonTo_ThuongTru']
+TEMP_COLS = ['Temp_XaPhuong_KhaiSinh', 'Temp_ThonTo_KhaiSinh', 
+             'Temp_XaPhuong_ThuongTru', 'Temp_ThonTo_ThuongTru']
 
-# Cột này chỉ đọc, không cho sửa
 READ_ONLY_COLS = [
     'STT', 'ID', 'Họ và tên *', 'Sinh ngày * (dd/mm/yyyy)', 
     'Tổ chức Đảng đang sinh hoạt * (không sửa)',
-    # Thêm cột rác này vào readonly để user không quan tâm
-    'Đề nghị xóa (do đang viên không thuộc chi bộ)/ (Nếu muốn xóa chọn "có", còn không bỏ qua)'
+    'Đề nghị xóa (do đảng viên không thuộc chi bộ)/ (Nếu muốn xóa chọn "có", còn không bỏ qua)'
 ]
 
 SHEET_NAME_MAIN = "Sheet1"
 SHEET_NAME_BACKUP = "Backup"
 
-# --- HÀM KẾT NỐI ---
+# ========================================
+# 🔥 GIẢI PHÁP AUTO-RETRY KHI GẶP LỖI 429
+# ========================================
+
+def retry_on_rate_limit(max_retries=5, initial_wait=2):
+    """
+    Decorator tự động retry khi gặp lỗi 429 (Rate Limit)
+    
+    Args:
+        max_retries: Số lần thử lại tối đa (default: 5)
+        initial_wait: Thời gian chờ ban đầu (giây, default: 2)
+    
+    Exponential backoff: 2s -> 4s -> 8s -> 16s -> 32s
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            wait_time = initial_wait
+            
+            for attempt in range(max_retries):
+                try:
+                    # Thử thực hiện hàm
+                    return func(*args, **kwargs)
+                
+                except gspread.exceptions.APIError as e:
+                    # Kiểm tra xem có phải lỗi 429 không
+                    if e.response.status_code == 429:
+                        if attempt < max_retries - 1:  # Còn lần thử
+                            # Hiển thị thông báo thân thiện
+                            with st.spinner(
+                                f"⏳ Hệ thống đang bận, đang chờ {wait_time}s... "
+                                f"(Lần thử {attempt + 1}/{max_retries})"
+                            ):
+                                time.sleep(wait_time)
+                            
+                            # Tăng thời gian chờ gấp đôi (exponential backoff)
+                            wait_time *= 2
+                        else:
+                            # Hết lượt thử
+                            st.error(
+                                "❌ Hệ thống quá tải. Vui lòng thử lại sau 1 phút. "
+                                "Nếu lỗi lặp lại, liên hệ admin."
+                            )
+                            raise
+                    else:
+                        # Lỗi khác (không phải 429)
+                        raise
+                
+                except Exception as e:
+                    # Lỗi không xác định
+                    st.error(f"⚠️ Lỗi không xác định: {str(e)}")
+                    raise
+            
+            # Không bao giờ tới đây (đã raise ở trên)
+            return None
+        
+        return wrapper
+    return decorator
+
+# ========================================
+# ✅ ÁP DỤNG RETRY CHO TẤT CẢ REQUESTS
+# ========================================
+
 @st.cache_resource
 def connect_to_workbook():
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    """Kết nối 1 lần duy nhất, tái sử dụng cho toàn bộ app"""
+    scope = ["https://spreadsheets.google.com/feeds", 
+             "https://www.googleapis.com/auth/drive"]
     try:
-        creds = ServiceAccountCredentials.from_json_keyfile_name("service_account.json", scope)
+        creds = ServiceAccountCredentials.from_json_keyfile_name(
+            "service_account.json", scope
+        )
     except:
         import json
         key_dict = json.loads(st.secrets["textkey"])
         creds = ServiceAccountCredentials.from_json_keyfile_dict(key_dict, scope)
+    
     client = gspread.authorize(creds)
     return client.open("DanhSachDangVien")
 
-def load_data_main():
-    workbook = connect_to_workbook()
-    sheet = workbook.worksheet(SHEET_NAME_MAIN)
-    
-    # Lấy toàn bộ giá trị dưới dạng chuỗi (để tránh Google tự convert sang số)
-    # Tuy nhiên get_all_records đôi khi vẫn tự convert, nên ta cần xử lý kỹ ở bước DataFrame
-    data = sheet.get_all_records(expected_headers=ALL_COLUMNS)
+@retry_on_rate_limit(max_retries=5, initial_wait=2)
+def safe_get_all_records(sheet, expected_headers):
+    """Wrapper có retry cho get_all_records"""
+    return sheet.get_all_records(expected_headers=expected_headers)
+
+@retry_on_rate_limit(max_retries=5, initial_wait=2)
+def safe_update_sheet(sheet, cell_range, values, value_input_option='USER_ENTERED'):
+    """Wrapper có retry cho update"""
+    return sheet.update(cell_range, values, value_input_option=value_input_option)
+
+@retry_on_rate_limit(max_retries=5, initial_wait=2)
+def safe_append_row(sheet, row_data, value_input_option='USER_ENTERED'):
+    """Wrapper có retry cho append_row"""
+    return sheet.append_row(row_data, value_input_option=value_input_option)
+
+@retry_on_rate_limit(max_retries=5, initial_wait=2)
+def safe_get_all_values(sheet):
+    """Wrapper có retry cho get_all_values"""
+    return sheet.get_all_values()
+
+@st.cache_data(ttl=CACHE_TTL)
+def load_data_main_cached(_sheet):
+    """
+    Load data 1 lần, cache 5 phút
+    Có retry tự động khi gặp lỗi 429
+    """
+    # Sử dụng hàm safe thay vì gọi trực tiếp
+    data = safe_get_all_records(_sheet, ALL_COLUMNS)
     df = pd.DataFrame(data)
     
-    # --- XỬ LÝ SỐ 0 Ở ĐẦU ---
-    # Danh sách các cột cần đảm bảo là chuỗi và có số 0
+    # Xử lý số 0 ở đầu
     cols_need_zero = [
         'Số định danh cá nhân *', 
         'Số thẻ Đảng* (12 số theo HD38-HD/BTCTW)',
@@ -97,153 +168,251 @@ def load_data_main():
     
     for col in cols_need_zero:
         if col in df.columns:
-            # Bước 1: Ép về kiểu chuỗi, xử lý lỗi .0 (ví dụ 123.0 -> 123)
             df[col] = df[col].astype(str).replace(r'\.0$', '', regex=True)
-            
-            # Bước 2: Thay thế 'nan' hoặc chuỗi rỗng bằng ''
             df[col] = df[col].replace(['nan', 'None', ''], '')
-            
-            # Bước 3: Nếu có dữ liệu (khác rỗng), thêm số 0 vào đầu cho đủ 12 ký tự
-            # Lưu ý: Chỉ fill nếu nó là chuỗi số. Nếu đang trống thì giữ nguyên.
-            df[col] = df[col].apply(lambda x: x.zfill(12) if x.strip() != '' and x.isdigit() else x)
+            df[col] = df[col].apply(
+                lambda x: x.zfill(12) if x.strip() != '' and x.isdigit() else x
+            )
 
-    # Ép kiểu ID về string để so sánh trong logic tìm kiếm
     df['ID'] = df['ID'].astype(str).replace(r'\.0$', '', regex=True)
-    
+    return df
+
+def load_data_main():
+    """Wrapper để tương thích với code cũ"""
+    workbook = connect_to_workbook()
+    sheet = workbook.worksheet(SHEET_NAME_MAIN)
+    df = load_data_main_cached(sheet)
     return df, sheet, workbook
 
-# --- GIAO DIỆN CHÍNH ---
-st.set_page_config(page_title="Cập nhật thông tin Đảng viên CBSV II -NEU", layout="wide")
+# ========================================
+# ✅ SESSION STATE MANAGEMENT
+# ========================================
+
+def init_session_data():
+    """Khởi tạo data trong session_state khi cần"""
+    if 'data_loaded' not in st.session_state:
+        with st.spinner("🔄 Đang tải dữ liệu lần đầu..."):
+            df, sheet, workbook = load_data_main()
+            st.session_state.df_main = df
+            st.session_state.main_sheet = sheet
+            st.session_state.workbook = workbook
+            st.session_state.data_loaded = True
+            st.session_state.last_load_time = time.time()
+
+def get_session_data():
+    """Lấy data từ session thay vì load lại"""
+    init_session_data()
+    return (
+        st.session_state.df_main,
+        st.session_state.main_sheet,
+        st.session_state.workbook
+    )
+
+def force_refresh_data():
+    """
+    Buộc refresh data - CHỈ DÀNH CHO ADMIN
+    Xóa cache toàn cục để load data mới nhất
+    """
+    st.cache_data.clear()  # Xóa cache chung
+    
+    # Xóa session riêng của user hiện tại
+    for key in ['data_loaded', 'df_main', 'main_sheet', 'workbook', 'last_load_time']:
+        if key in st.session_state:
+            del st.session_state[key]
+    
+    # Load lại data mới
+    init_session_data()
+
+# ========================================
+# ✅ SAVE WITH RETRY
+# ========================================
+
+def save_update_optimized(sheet, row_index, updated_values, workbook):
+    """
+    Ghi 1 lần duy nhất với retry tự động
+    ✅ SAU KHI LƯU → CHỈ XÓA SESSION CỦA USER HIỆN TẠI
+    (Không xóa cache chung vì mỗi người chỉ sửa data của mình)
+    """
+    try:
+        # 1. Chuẩn bị data
+        row_vals = [updated_values.get(c, "") for c in ALL_COLUMNS]
+        
+        # 2. Backup (có retry)
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            backup_sheet = workbook.worksheet(SHEET_NAME_BACKUP)
+            safe_append_row(backup_sheet, [ts] + row_vals)
+        except Exception as e:
+            st.warning(f"⚠️ Không thể backup (không ảnh hưởng dữ liệu chính): {e}")
+        
+        # 3. Update Sheet chính (có retry)
+        safe_update_sheet(sheet, f"A{row_index + 2}", [row_vals])
+        
+        # 4. Chỉ xóa session của user hiện tại để họ thấy data mới của mình
+        # KHÔNG xóa cache chung vì không ảnh hưởng user khác
+        for key in ['data_loaded', 'df_main', 'main_sheet', 'workbook']:
+            if key in st.session_state:
+                del st.session_state[key]
+        
+        return True
+    
+    except Exception as e:
+        st.error(f"❌ Lỗi lưu dữ liệu: {str(e)}")
+        return False
+
+# ========================================
+# ✅ ADMIN DASHBOARD WITH RETRY
+# ========================================
+
+@st.cache_data(ttl=CACHE_TTL)
+def get_updated_ids(_backup_sheet):
+    """Cache danh sách ID đã update với retry"""
+    try:
+        backup_rows = safe_get_all_values(_backup_sheet)
+        if len(backup_rows) > 1:
+            return set([
+                str(row[2]).replace('.0', '') 
+                for row in backup_rows[1:] 
+                if len(row) > 2
+            ])
+        return set()
+    except Exception as e:
+        st.warning(f"⚠️ Không thể tải backup sheet: {e}")
+        return set()
+
+# ========================================
+# 🎨 GIAO DIỆN CHÍNH
+# ========================================
+
+st.set_page_config(
+    page_title="Cập nhật thông tin Đảng viên CBSV II -NEU", 
+    layout="wide"
+)
+
 st.markdown("""
     <style>
-    /* Chỉ áp dụng khi màn hình nhỏ hơn 768px (Điện thoại dọc) */
     @media only screen and (max-width: 768px) {
-        
-        /* 1. Chỉnh lại container chính để không bị che bởi thanh menu trên cùng */
         .block-container {
-            padding-top: 4.5rem !important; /* Tăng từ 2rem lên 4.5rem */
+            padding-top: 4.5rem !important;
             padding-left: 1rem !important;
             padding-right: 1rem !important;
         }
-        
-        /* 2. Thu nhỏ tiêu đề chính (H1) */
-        h1 {
-            font-size: 1.6rem !important; /* Giảm thêm chút nữa cho gọn */
-            padding-top: 0rem !important;
-        }
-        
-        /* 3. Thu nhỏ tiêu đề phụ (H2, H3) */
-        h2 {
-            font-size: 1.3rem !important;
-        }
-        h3 {
-            font-size: 1.1rem !important;
-        }
-        
-        /* 4. Thu nhỏ chữ trong ô nhập liệu và nhãn */
-        .stTextInput label, .stSelectbox label {
-            font-size: 0.9rem !important;
-        }
-        .stTextInput input {
-            font-size: 0.9rem !important;
-        }
-        
-        /* 5. Chỉnh nút bấm */
-        .stButton button {
-            font-size: 1rem !important;
-            width: 100% !important; /* Cho nút bấm full chiều ngang bấm cho dễ */
-        }
+        h1 { font-size: 1.6rem !important; }
+        h2 { font-size: 1.3rem !important; }
+        h3 { font-size: 1.1rem !important; }
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- SIDEBAR MENU ---
+# --- SIDEBAR ---
 st.sidebar.title("Menu")
-app_mode = st.sidebar.radio("Chọn chức năng:", ["👤 Cập nhật thông tin", "📊 Admin Dashboard"])
+app_mode = st.sidebar.radio(
+    "Chọn chức năng:", 
+    ["👤 Cập nhật thông tin", "📊 Admin Dashboard"]
+)
+
+# ✅ HIỂN THỊ TRẠNG THÁI CACHE (CHỈ CHO ADMIN)
+if app_mode == "📊 Admin Dashboard":
+    st.sidebar.divider()
+    st.sidebar.markdown("### 📊 Trạng thái dữ liệu")
+
+    if 'last_load_time' in st.session_state:
+        elapsed = int(time.time() - st.session_state.last_load_time)
+        minutes, seconds = divmod(elapsed, 60)
+        
+        if elapsed > 300:  # > 5 phút
+            st.sidebar.warning(f"⚠️ Dữ liệu đã cũ {minutes}p {seconds}s")
+        else:
+            st.sidebar.success(f"✅ Cập nhật {minutes}p {seconds}s trước")
+        
+        if st.sidebar.button("🔄 Làm mới dữ liệu", help="Tải lại data mới nhất (dùng khi cần thống kê real-time)"):
+            with st.spinner("Đang tải dữ liệu mới..."):
+                force_refresh_data()
+            st.rerun()
+        
+        st.sidebar.caption("💡 Cache tự động làm mới mỗi 5 phút")
+    else:
+        st.sidebar.info("Chưa tải dữ liệu")
 
 # =========================================================
 # CHẾ ĐỘ 1: NGƯỜI DÙNG CẬP NHẬT
 # =========================================================
+
 if app_mode == "👤 Cập nhật thông tin":
     st.title("📝 Cập nhật thông tin Đảng viên CBSV II -NEU")
     
-    # Khởi tạo state nếu chưa có
+    # Khởi tạo session states
     if 'step' not in st.session_state:
         st.session_state.step = 1
     if 'selected_row_index' not in st.session_state:
         st.session_state.selected_row_index = None
 
-# --- STEP 1: SEARCH ---
+    # --- BƯỚC 1: TÌM KIẾM ---
     if st.session_state.step == 1:
         st.subheader("Bước 1: Tra cứu thông tin")
         
-        # Initialize search mode state if not present
         if 'search_mode' not in st.session_state:
-            st.session_state.search_mode = 'id'  # Default to ID search
+            st.session_state.search_mode = 'id'
 
-        # --- MODE 1: SEARCH BY ID (Preferred) ---
         if st.session_state.search_mode == 'id':
             with st.form("search_id_form"):
                 st.markdown("#### 🔍 Tra cứu bằng Số định danh cá nhân (CCCD/ĐDCN)")
-                search_id = st.text_input("Nhập Số định danh cá nhân (12 số):", placeholder="Ví dụ: 030098123456")
+                search_id = st.text_input(
+                    "Nhập Số định danh cá nhân (12 số):", 
+                    placeholder="Ví dụ: 030098123456"
+                )
                 submitted_id = st.form_submit_button("Tra cứu ngay", type="primary")
 
                 if submitted_id:
                     if not search_id:
                         st.warning("Vui lòng nhập Số định danh cá nhân.")
                     else:
-                        with st.spinner("Đang tìm kiếm theo số định danh..."):
-                            df, _, _ = load_data_main()
+                        with st.spinner("🔍 Đang tìm kiếm..."):
+                            df, _, _ = get_session_data()
                             
-                            # Normalize input and data for comparison (remove spaces, ensure string)
                             clean_input_id = search_id.strip()
-                            
-                            # Ensure the column is treated as string for comparison
-                            # Note: 'Số định danh cá nhân *' is the exact column name
                             mask = df['Số định danh cá nhân *'].astype(str).str.strip() == clean_input_id
                             results = df[mask]
 
                             if not results.empty:
-                                st.success(f"✅ Tìm thấy thông tin của: {results.iloc[0]['Họ và tên *']}")
+                                st.success(f"✅ Tìm thấy: {results.iloc[0]['Họ và tên *']}")
                                 st.session_state.search_results = results
                                 st.session_state.step = 2
                                 st.rerun()
                             else:
-                                st.error(f"❌ Không tìm thấy số định danh: {clean_input_id}")
-                                # Enable fallback option
+                                st.error(f"❌ Không tìm thấy: {clean_input_id}")
                                 st.session_state.show_name_search_option = True
 
-            # Show button to switch to Name search if ID search fails or user wants to switch
             if st.session_state.get('show_name_search_option', False):
-                st.info("Không tìm thấy? Có thể số định danh chưa được cập nhật chính xác.")
-                if st.button("👉 Thử tìm bằng Họ Tên và Ngày Sinh"):
+                st.info("💡 Không tìm thấy? Thử tìm bằng Họ Tên.")
+                if st.button("👉 Tìm bằng Họ Tên & Ngày Sinh"):
                     st.session_state.search_mode = 'name'
                     st.rerun()
             
-            # Optional: Link to switch mode manually if they don't have ID handy
             elif st.button("Chuyển sang tìm bằng Họ Tên & Ngày Sinh"):
                 st.session_state.search_mode = 'name'
                 st.rerun()
 
-        # --- MODE 2: SEARCH BY NAME & DOB (Fallback) ---
         elif st.session_state.search_mode == 'name':
             with st.form("search_name_form"):
                 st.markdown("#### 👤 Tra cứu bằng Họ Tên và Ngày Sinh")
-                col_s1, col_s2 = st.columns(2)
-                with col_s1:
+                col1, col2 = st.columns(2)
+                with col1:
                     search_name = st.text_input("Họ và tên (đầy đủ có dấu):")
-                with col_s2:
-                    search_dob = st.text_input("Ngày sinh (dd/mm/yyyy):", placeholder="Ví dụ: 05/01/2005")
+                with col2:
+                    search_dob = st.text_input(
+                        "Ngày sinh (dd/mm/yyyy):", 
+                        placeholder="Ví dụ: 05/01/2005"
+                    )
                 
                 submitted_name = st.form_submit_button("Tra cứu", type="primary")
 
                 if submitted_name:
                     if not search_name or not search_dob:
-                        st.warning("Vui lòng nhập đầy đủ Họ tên và Ngày sinh.")
+                        st.warning("Vui lòng nhập đầy đủ.")
                     else:
-                        with st.spinner("Đang tìm kiếm..."):
-                            df, _, _ = load_data_main()
-                            # Case-insensitive search
+                        with st.spinner("🔍 Đang tìm kiếm..."):
+                            df, _, _ = get_session_data()
                             mask = (
                                 df['Họ và tên *'].str.strip().str.lower() == search_name.strip().lower()
                             ) & (
@@ -252,15 +421,14 @@ if app_mode == "👤 Cập nhật thông tin":
                             results = df[mask]
 
                             if results.empty:
-                                st.error("❌ Không tìm thấy thông tin.")
-                                st.info("Lưu ý: Kiểm tra kỹ chính tả tiếng Việt và định dạng ngày (dd/mm/yyyy).")
+                                st.error("❌ Không tìm thấy.")
+                                st.info("💡 Kiểm tra lại chính tả và định dạng ngày.")
                             else:
-                                st.success(f"Tìm thấy {len(results)} kết quả.")
+                                st.success(f"✅ Tìm thấy {len(results)} kết quả.")
                                 st.session_state.search_results = results
                                 st.session_state.step = 2
                                 st.rerun()
             
-            # Button to go back to ID search
             if st.button("⬅️ Quay lại tìm bằng Số định danh"):
                 st.session_state.search_mode = 'id'
                 st.session_state.show_name_search_option = False
@@ -281,7 +449,6 @@ if app_mode == "👤 Cập nhật thông tin":
                     st.text(f"Đơn vị: {row['Tổ chức Đảng đang sinh hoạt * (không sửa)']}")
                     st.text(f"Ngày vào Đảng: {row['Ngày vào Đảng* (dd/mm/yyyy)']}")
                 with c2:
-                    # Lưu index thực của dòng trong DataFrame gốc
                     if st.button("CẬP NHẬT", key=f"btn_{index}", type="primary"):
                         st.session_state.selected_row_index = index
                         st.session_state.step = 3
@@ -292,30 +459,31 @@ if app_mode == "👤 Cập nhật thông tin":
             st.session_state.step = 1
             st.rerun()
 
-# --- BƯỚC 3: CẬP NHẬT THÔNG TIN (INTERACTIVE MODE) ---
+    # --- BƯỚC 3: CẬP NHẬT ---
     elif st.session_state.step == 3:
         st.subheader("Bước 3: Cập nhật thông tin chi tiết")
         
-        # 1. Load Data Địa chính
+        # Load location data
         import json
         @st.cache_data
         def load_location_data():
             try:
                 with open('vietnam_data.json', 'r', encoding='utf-8') as f:
                     return json.load(f)
-            except FileNotFoundError: return {}
+            except FileNotFoundError:
+                return {}
 
         vn_locations = load_location_data()
         list_tinh = list(vn_locations.keys())
         
-        # 2. Load Data User
-        df, main_sheet, workbook = load_data_main()
+        df, main_sheet, workbook = get_session_data()
         idx = st.session_state.selected_row_index
         
         try:
             current_data = df.loc[idx]
         except KeyError:
-            st.error("Phiên làm việc hết hạn."); st.stop()
+            st.error("⚠️ Phiên làm việc hết hạn. Vui lòng tìm kiếm lại.")
+            st.stop()
 
         st.write("Kiểm tra và chỉnh sửa các thông tin dưới đây:")
         
@@ -328,19 +496,25 @@ if app_mode == "👤 Cập nhật thông tin":
             'Nơi cấp thẻ Đảng', 'Số CMND cũ (nếu có)', 'Tên gọi khác'
         ]
 
-        # --- BẮT ĐẦU VÒNG LẶP HIỂN THỊ FORM ---
+        # --- FORM CẬP NHẬT (GIỮ NGUYÊN LOGIC CŨ) ---
         for col in ALL_COLUMNS:
-            if col in TEMP_COLS: continue
+            if col in TEMP_COLS:
+                continue
             
             val = current_data.get(col, "")
 
-            # ========================================================
-            # 1. KHAI SINH
-            # ========================================================
+            # KHAI SINH
             if col == 'Nơi đăng ký khai sinh - Quốc gia *':
-                st.markdown("---"); st.subheader("🏠 THÔNG TIN KHAI SINH")
+                st.markdown("---")
+                st.subheader("🏠 THÔNG TIN KHAI SINH")
                 is_russia = str(val).strip().upper() in ["LIÊN BANG NGA", "NGA", "RUSSIA"]
-                ks_quocgia = st.radio("Quốc gia *", ["Việt Nam", "Liên Bang Nga"], index=1 if is_russia else 0, horizontal=True, key="ks_qg")
+                ks_quocgia = st.radio(
+                    "Quốc gia *", 
+                    ["Việt Nam", "Liên Bang Nga"], 
+                    index=1 if is_russia else 0, 
+                    horizontal=True, 
+                    key="ks_qg"
+                )
                 updated_values[col] = ks_quocgia
 
             elif col == 'Nơi đăng ký khai sinh - Tỉnh *':
@@ -349,17 +523,21 @@ if app_mode == "👤 Cập nhật thông tin":
                     st.text_input("Tỉnh *", value="KHÔNG", disabled=True, key="ks_tinh_nga")
                     updated_values[col] = "KHÔNG"
                 else:
-                    try: idx = list_tinh.index(str(val))
-                    except: idx = 0
-                    ks_tinh = st.selectbox("Tỉnh *", list_tinh, index=idx, key="ks_tinh_vn")
+                    try:
+                        idx_t = list_tinh.index(str(val))
+                    except:
+                        idx_t = 0
+                    ks_tinh = st.selectbox("Tỉnh *", list_tinh, index=idx_t, key="ks_tinh_vn")
                     updated_values[col] = ks_tinh
 
             elif col == 'Nơi đăng ký khai sinh - Địa chỉ chi tiết *':
                 cur_qg = st.session_state.get("ks_qg", "Việt Nam")
                 if cur_qg == "Liên Bang Nga":
                     c1, c2 = st.columns(2)
-                    with c1: st.text_input("Xã/Phường/ Đặc khu *", value="KHÔNG", disabled=True, key="ks_xa_nga")
-                    with c2: st.text_input("Địa chỉ chi tiết (Thôn/Tổ...)*", value="KHÔNG", disabled=True, key="ks_thon_nga")
+                    with c1:
+                        st.text_input("Xã/Phường *", value="KHÔNG", disabled=True, key="ks_xa_nga")
+                    with c2:
+                        st.text_input("Địa chỉ chi tiết *", value="KHÔNG", disabled=True, key="ks_thon_nga")
                     updated_values['Temp_XaPhuong_KhaiSinh'] = "KHÔNG"
                     updated_values['Temp_ThonTo_KhaiSinh'] = "KHÔNG"
                     updated_values[col] = "KHÔNG"
@@ -371,54 +549,62 @@ if app_mode == "👤 Cập nhật thông tin":
                     val_thon = current_data.get('Temp_ThonTo_KhaiSinh', '')
                     if not val_xa and str(val):
                         parts = str(val).split(',')
-                        if len(parts) >= 2: val_xa = parts[-1].strip(); val_thon = ",".join(parts[:-1]).strip()
+                        if len(parts) >= 2:
+                            val_xa = parts[-1].strip()
+                            val_thon = ",".join(parts[:-1]).strip()
 
                     c1, c2 = st.columns(2)
                     with c1:
-                        try: idx = list_xa.index(val_xa)
-                        except: idx = 0
-                        input_xa = st.selectbox("Xã/Phường/ Đặc khu *", list_xa, index=idx, key="ks_xa_vn")
+                        try:
+                            idx_x = list_xa.index(val_xa)
+                        except:
+                            idx_x = 0
+                        input_xa = st.selectbox("Xã/Phường *", list_xa, index=idx_x, key="ks_xa_vn")
                     with c2:
-                        input_thon = st.text_input("Địa chỉ chi tiết dưới Xã/Phường/ Đặc khu *", value=str(val_thon), key="ks_thon_vn")
+                        input_thon = st.text_input("Địa chỉ chi tiết *", value=str(val_thon), key="ks_thon_vn")
                     
                     updated_values['Temp_XaPhuong_KhaiSinh'] = input_xa
                     updated_values['Temp_ThonTo_KhaiSinh'] = input_thon
                     updated_values[col] = f"{input_thon}, {input_xa}".strip(", ")
 
-            # ========================================================
-            # 2. QUÊ QUÁN
-            # ========================================================
+            # QUÊ QUÁN
             elif col == 'Quê quán (theo mô hình 2 cấp) - Quốc gia *':
-                st.markdown("---"); st.subheader("🏠 THÔNG TIN QUÊ QUÁN")
+                st.markdown("---")
+                st.subheader("🏠 THÔNG TIN QUÊ QUÁN")
                 st.text_input("Quốc gia *", value="Việt Nam", disabled=True, key="qq_qg")
                 updated_values[col] = "Việt Nam"
 
             elif col == 'Quê quán (theo mô hình 2 cấp) - Tỉnh *':
-                try: idx = list_tinh.index(str(val))
-                except: idx = 0
-                qq_tinh = st.selectbox("Tỉnh *", list_tinh, index=idx, key="qq_tinh")
+                try:
+                    idx_t = list_tinh.index(str(val))
+                except:
+                    idx_t = 0
+                qq_tinh = st.selectbox("Tỉnh *", list_tinh, index=idx_t, key="qq_tinh")
                 updated_values[col] = qq_tinh
 
             elif col == 'Quê quán (theo mô hình 2 cấp) - Địa chỉ chi tiết *':
                 cur_tinh = st.session_state.get("qq_tinh", "")
                 list_xa = vn_locations.get(cur_tinh, [])
-                try: idx = list_xa.index(str(val))
-                except: idx = 0
-                qq_xa = st.selectbox("Xã/Phường/ Đặc khu *", list_xa, index=idx, key="qq_xa")
+                try:
+                    idx_x = list_xa.index(str(val))
+                except:
+                    idx_x = 0
+                qq_xa = st.selectbox("Xã/Phường *", list_xa, index=idx_x, key="qq_xa")
                 updated_values[col] = qq_xa
 
-            # ========================================================
-            # 3. THƯỜNG TRÚ
-            # ========================================================
+            # THƯỜNG TRÚ
             elif col == 'Thường trú (theo mô hình 2 cấp) - Quốc gia *':
-                st.markdown("---"); st.subheader("🏠 THÔNG TIN THƯỜNG TRÚ")
+                st.markdown("---")
+                st.subheader("🏠 THÔNG TIN THƯỜNG TRÚ")
                 st.text_input("Quốc gia *", value="Việt Nam", disabled=True, key="tt_qg")
                 updated_values[col] = "Việt Nam"
 
             elif col == 'Thường trú (theo mô hình 2 cấp) - Tỉnh *':
-                try: idx = list_tinh.index(str(val))
-                except: idx = 0
-                tt_tinh = st.selectbox("Tỉnh *", list_tinh, index=idx, key="tt_tinh")
+                try:
+                    idx_t = list_tinh.index(str(val))
+                except:
+                    idx_t = 0
+                tt_tinh = st.selectbox("Tỉnh *", list_tinh, index=idx_t, key="tt_tinh")
                 updated_values[col] = tt_tinh
 
             elif col == 'Thường trú (theo mô hình 2 cấp) - Địa chỉ chi tiết *':
@@ -429,85 +615,85 @@ if app_mode == "👤 Cập nhật thông tin":
                 val_thon = current_data.get('Temp_ThonTo_ThuongTru', '')
                 if not val_xa and str(val):
                     parts = str(val).split(',')
-                    if len(parts) >= 2: val_xa = parts[-1].strip(); val_thon = ",".join(parts[:-1]).strip()
+                    if len(parts) >= 2:
+                        val_xa = parts[-1].strip()
+                        val_thon = ",".join(parts[:-1]).strip()
 
                 c1, c2 = st.columns(2)
                 with c1:
-                    try: idx = list_xa.index(val_xa)
-                    except: idx = 0
-                    tt_xa = st.selectbox("Xã/Phường/ Đặc khu *", list_xa, index=idx, key="tt_xa")
+                    try:
+                        idx_x = list_xa.index(val_xa)
+                    except:
+                        idx_x = 0
+                    tt_xa = st.selectbox("Xã/Phường *", list_xa, index=idx_x, key="tt_xa")
                 with c2:
-                    tt_thon = st.text_input("Địa chỉ chi tiết dưới Xã/Phường/ Đặc khu *", value=str(val_thon), key="tt_thon")
-                    st.caption("💡 Cách ghi: ghi chi tiết nhất có thể, bao gồm: số nhà, đường phố/thôn/xóm/tổ... (ví dụ Thôn Hòa Bình Hạ/ Tổ dân số 5/ Số 60 Ngách 6/12 Đội Nhân)")
+                    tt_thon = st.text_input("Địa chỉ chi tiết *", value=str(val_thon), key="tt_thon")
+                    st.caption("💡 Ghi chi tiết: số nhà, đường phố/thôn/xóm/tổ...")
 
                 updated_values['Temp_XaPhuong_ThuongTru'] = tt_xa
                 updated_values['Temp_ThonTo_ThuongTru'] = tt_thon
                 updated_values[col] = f"{tt_thon}, {tt_xa}".strip(", ")
 
-            # ========================================================
             # CÁC TRƯỜNG KHÁC
-            # ========================================================
             else:
                 clean_label = col
                 for p in ["Nơi đăng ký khai sinh - ", "Quê quán (theo mô hình 2 cấp) - ", "Thường trú (theo mô hình 2 cấp) - "]:
                     clean_label = clean_label.replace(p, "")
                 
-                if col in OPTIONAL_COLS: clean_label = clean_label.replace('*', '')
+                if col in OPTIONAL_COLS:
+                    clean_label = clean_label.replace('*', '')
 
                 if col in READ_ONLY_COLS:
                     st.text_input(clean_label, value=val, disabled=True, key=col)
                     updated_values[col] = str(val)
                 elif col == 'Trạng thái hoạt động':
                     opts = ["Đang sinh hoạt Đảng", "Đã chuyển sinh hoạt"]
-                    idx = opts.index(val) if val in opts else 0
-                    updated_values[col] = st.selectbox(clean_label, opts, index=idx, key=col)
+                    idx_opt = opts.index(val) if val in opts else 0
+                    updated_values[col] = st.selectbox(clean_label, opts, index=idx_opt, key=col)
                 elif col == 'Giới tính *':
                     opts = ["Nam", "Nữ"]
-                    idx = opts.index(val) if val in opts else 0
-                    updated_values[col] = st.selectbox(clean_label, opts, index=idx, key=col)
+                    idx_opt = opts.index(val) if val in opts else 0
+                    updated_values[col] = st.selectbox(clean_label, opts, index=idx_opt, key=col)
                 else:
                     ph = "Để trống nếu chưa có thông tin" if col in OPTIONAL_COLS else ""
                     updated_values[col] = st.text_input(clean_label, value=str(val), placeholder=ph, key=col)
 
         st.write("---")
         
-        # --- NÚT LƯU VÀ VALIDATION (NÂNG CẤP CHECK RIÊNG LẺ) ---
+        # --- NÚT LƯU VÀ VALIDATION ---
         if st.button("💾 LƯU THÔNG TIN", type="primary", use_container_width=True):
             
             missing_fields = []
 
-            # 1. CHECK KHAI SINH (Kiểm tra kỹ từng thành phần)
+            # 1. CHECK KHAI SINH
             if updated_values.get('Nơi đăng ký khai sinh - Quốc gia *') == "Việt Nam":
-                if not updated_values.get('Nơi đăng ký khai sinh - Tỉnh *'): 
+                if not updated_values.get('Nơi đăng ký khai sinh - Tỉnh *'):
                     missing_fields.append("Khai sinh: Chưa chọn Tỉnh")
-                # Check Xã (Temp)
-                if not str(updated_values.get('Temp_XaPhuong_KhaiSinh', '')).strip(): 
+                if not str(updated_values.get('Temp_XaPhuong_KhaiSinh', '')).strip():
                     missing_fields.append("Khai sinh: Chưa chọn Xã/Phường")
-                # Check Thôn (Temp)
-                if not str(updated_values.get('Temp_ThonTo_KhaiSinh', '')).strip(): 
+                if not str(updated_values.get('Temp_ThonTo_KhaiSinh', '')).strip():
                     missing_fields.append("Khai sinh: Chưa nhập Thôn/Tổ/Số nhà")
 
             # 2. CHECK QUÊ QUÁN
             if updated_values.get('Quê quán (theo mô hình 2 cấp) - Quốc gia *') == "Việt Nam":
-                if not updated_values.get('Quê quán (theo mô hình 2 cấp) - Tỉnh *'): 
+                if not updated_values.get('Quê quán (theo mô hình 2 cấp) - Tỉnh *'):
                     missing_fields.append("Quê quán: Chưa chọn Tỉnh")
-                # Quê quán chỉ cần Xã (check trực tiếp giá trị cột chính vì không có cột Temp riêng cho Xã Quê Quán trong logic cũ)
                 if not str(updated_values.get('Quê quán (theo mô hình 2 cấp) - Địa chỉ chi tiết *', '')).strip():
                     missing_fields.append("Quê quán: Chưa chọn Xã/Phường")
 
             # 3. CHECK THƯỜNG TRÚ
             if updated_values.get('Thường trú (theo mô hình 2 cấp) - Quốc gia *') == "Việt Nam":
-                if not updated_values.get('Thường trú (theo mô hình 2 cấp) - Tỉnh *'): 
+                if not updated_values.get('Thường trú (theo mô hình 2 cấp) - Tỉnh *'):
                     missing_fields.append("Thường trú: Chưa chọn Tỉnh")
-                if not str(updated_values.get('Temp_XaPhuong_ThuongTru', '')).strip(): 
+                if not str(updated_values.get('Temp_XaPhuong_ThuongTru', '')).strip():
                     missing_fields.append("Thường trú: Chưa chọn Xã/Phường")
-                if not str(updated_values.get('Temp_ThonTo_ThuongTru', '')).strip(): 
+                if not str(updated_values.get('Temp_ThonTo_ThuongTru', '')).strip():
                     missing_fields.append("Thường trú: Chưa nhập Thôn/Tổ/Số nhà")
 
-            # 4. CHECK CÁC TRƯỜNG CÒN LẠI (Dùng danh sách REQUIRE cũ)
+            # 4. CHECK CÁC TRƯỜNG CÒN LẠI
             OTHER_REQUIRE = [
                 'STT', 'ID', 'Họ và tên *', 'Giới tính *', 'Sinh ngày * (dd/mm/yyyy)',
-                'Dân tộc *', 'Tôn giáo *', 'Số định danh cá nhân *', 
+                'Dân tộc *', 'Tôn giáo *', 'Số định danh cá nhân *',
                 'Ngày vào Đảng* (dd/mm/yyyy)', 'Trạng thái hoạt động'
             ]
             
@@ -519,28 +705,24 @@ if app_mode == "👤 Cập nhật thông tin":
             # --- XỬ LÝ KẾT QUẢ CHECK ---
             if missing_fields:
                 st.error("⚠️ KHÔNG THỂ LƯU! Vui lòng điền đầy đủ các thông tin sau:", icon="🚫")
-                for f in missing_fields: st.markdown(f"- **{f}**")
+                for f in missing_fields:
+                    st.markdown(f"- **{f}**")
             else:
-                with st.spinner("Đang lưu dữ liệu..."):
-                    try:
-                        row_vals = [updated_values.get(c, "") for c in ALL_COLUMNS]
-                        try:
-                            ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                            workbook.worksheet(SHEET_NAME_BACKUP).append_row([ts] + row_vals)
-                        except: pass
-
-                        main_sheet.update(f"A{idx + 2}", [row_vals])
+                with st.spinner("💾 Đang lưu dữ liệu..."):
+                    success = save_update_optimized(main_sheet, idx, updated_values, workbook)
+                    
+                    if success:
+                        # Không cần force_refresh_data() vì đã xóa session trong save_update_optimized
                         st.session_state.step = 4
                         st.rerun()
-                    except Exception as e: st.error(f"Lỗi hệ thống: {e}")
 
         if st.button("Hủy bỏ"):
             st.session_state.step = 2
             st.rerun()
 
-    # --- BƯỚC 4: MÀN HÌNH THÔNG BÁO THÀNH CÔNG (MỚI) ---
+    # --- BƯỚC 4: THÀNH CÔNG ---
     elif st.session_state.step == 4:
-        st.balloons() # Hiệu ứng pháo giấy
+        st.balloons()
         
         st.success("✅ CẬP NHẬT THÀNH CÔNG!", icon="✅")
         
@@ -554,8 +736,7 @@ if app_mode == "👤 Cập nhật thông tin":
         st.write("")
         st.write("")
         
-        if st.button("⬅️ Quay về trang tìm kiếm để cập nhật người khác", type="primary", use_container_width=True):
-            # Reset toàn bộ session để về trạng thái ban đầu
+        if st.button("⬅️ Quay về trang tìm kiếm", type="primary", use_container_width=True):
             st.session_state.step = 1
             st.session_state.selected_row_index = None
             st.session_state.search_results = None
@@ -570,19 +751,14 @@ elif app_mode == "📊 Admin Dashboard":
     password = st.sidebar.text_input("Nhập mật khẩu Admin:", type="password")
     
     if password == ADMIN_PASSWORD:
-        with st.spinner("Đang tải dữ liệu thống kê..."):
-            # Load dữ liệu mới nhất từ Sheet1
-            df_main, _, workbook = load_data_main()
+        with st.spinner("📊 Đang tải thống kê..."):
+            df_main, _, workbook = get_session_data()
             
             try:
                 backup_sheet = workbook.worksheet(SHEET_NAME_BACKUP)
-                backup_rows = backup_sheet.get_all_values()
-                if len(backup_rows) > 1:
-                    updated_ids = set([str(row[2]).replace('.0', '') for row in backup_rows[1:] if len(row) > 2])
-                else:
-                    updated_ids = set()
+                updated_ids = get_updated_ids(backup_sheet)
             except gspread.exceptions.WorksheetNotFound:
-                st.error("Chưa có sheet Backup!")
+                st.error("⚠️ Chưa có sheet Backup!")
                 updated_ids = set()
 
             total_users = len(df_main)
@@ -601,10 +777,8 @@ elif app_mode == "📊 Admin Dashboard":
             # --- PHẦN 1: DANH SÁCH CHƯA CẬP NHẬT ---
             st.subheader(f"📋 Danh sách {not_updated_count} người CHƯA cập nhật")
             
-            # Lọc ra những người chưa cập nhật
             not_updated_df = df_main[~df_main['ID'].isin(updated_ids)].copy()
             
-            # Hiển thị trên web (Vẫn chỉ hiện ít cột cho gọn giao diện)
             display_cols = ['ID', 'Họ và tên *', 'Sinh ngày * (dd/mm/yyyy)', 'Tổ chức Đảng đang sinh hoạt * (không sửa)']
             st.dataframe(
                 not_updated_df[display_cols],
@@ -612,18 +786,14 @@ elif app_mode == "📊 Admin Dashboard":
                 hide_index=True
             )
 
-            # --- XỬ LÝ XUẤT FILE EXCEL ĐẦY ĐỦ ---
-            # Tạo bộ nhớ đệm cho file Excel
+            # --- XUẤT FILE EXCEL ĐẦY ĐỦ ---
             buffer_missing = io.BytesIO()
             
-            # Ghi toàn bộ dữ liệu (not_updated_df) ra Excel, không lọc cột
             with pd.ExcelWriter(buffer_missing, engine='openpyxl') as writer:
                 not_updated_df.to_excel(writer, index=False, sheet_name='ChuaCapNhat')
             
-            # Đưa con trỏ về đầu file
             buffer_missing.seek(0)
             
-            # Tên file kèm thời gian
             file_name_missing = f"DS_ChuaCapNhat_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
 
             col_dl1, col_dl2 = st.columns([1, 2])
@@ -638,16 +808,14 @@ elif app_mode == "📊 Admin Dashboard":
 
             st.divider()
 
-            # --- PHẦN 2: TẢI FILE TỔNG HỢP (MỚI THÊM) ---
+            # --- PHẦN 2: TẢI FILE TỔNG HỢP ---
             st.subheader("🗄️ Xuất dữ liệu tổng hợp đầy đủ")
-            st.write("Tải về file Excel chứa toàn bộ dữ liệu mới nhất từ hệ thống (bao gồm cả những người đã cập nhật và chưa cập nhật).")
+            st.write("Tải về file Excel chứa toàn bộ dữ liệu mới nhất từ hệ thống.")
 
-            # Xử lý xuất file Excel trong bộ nhớ (RAM) mà không cần lưu ra ổ cứng
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
                 df_main.to_excel(writer, index=False, sheet_name='DanhSachTongHop')
             
-            # Đưa con trỏ về đầu file để chuẩn bị tải
             buffer.seek(0)
 
             file_name_excel = f"TongHop_DangVien_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
@@ -660,44 +828,6 @@ elif app_mode == "📊 Admin Dashboard":
             )
             
     elif password:
-        st.error("Sai mật khẩu!")
+        st.error("❌ Sai mật khẩu!")
     else:
-
-        st.info("Vui lòng nhập mật khẩu để xem thống kê.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        st.info("🔒 Vui lòng nhập mật khẩu để xem thống kê.")
