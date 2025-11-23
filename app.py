@@ -51,18 +51,17 @@ ALL_COLUMNS = [
     'Temp_XaPhuong_KhaiSinh', 
     'Temp_ThonTo_KhaiSinh', 
     'Temp_XaPhuong_ThuongTru', 
-    'Temp_ThonTo_ThuongTru'
+    'Temp_ThonTo_ThuongTru',
+    'Ghi chú'
 ]
 
 # Danh sách cột phụ
-TEMP_COLS = ['Temp_XaPhuong_KhaiSinh', 'Temp_ThonTo_KhaiSinh', 'Temp_XaPhuong_ThuongTru', 'Temp_ThonTo_ThuongTru']
+TEMP_COLS = ['Temp_XaPhuong_KhaiSinh', 'Temp_ThonTo_KhaiSinh', 'Temp_XaPhuong_ThuongTru', 'Temp_ThonTo_ThuongTru', 'Ghi chú', 'Đề nghị xóa (do đang viên không thuộc chi bộ)/ (Nếu muốn xóa chọn "có", còn không bỏ qua)']
 
 # Cột này chỉ đọc, không cho sửa
 READ_ONLY_COLS = [
     'STT', 'ID', 'Họ và tên *', 'Sinh ngày * (dd/mm/yyyy)', 
-    'Tổ chức Đảng đang sinh hoạt * (không sửa)',
-    # Thêm cột rác này vào readonly để user không quan tâm
-    'Đề nghị xóa (do đang viên không thuộc chi bộ)/ (Nếu muốn xóa chọn "có", còn không bỏ qua)'
+    'Tổ chức Đảng đang sinh hoạt * (không sửa)'
 ]
 
 SHEET_NAME_MAIN = "Sheet1"
@@ -422,7 +421,7 @@ if app_mode == "👤 Cập nhật thông tin":
 
 # --- BƯỚC 3: CẬP NHẬT THÔNG TIN (INTERACTIVE MODE) ---
     elif st.session_state.step == 3:
-        st.subheader("Bước 3: Cập nhật thông tin chi tiết")
+
         
         # 1. Load Data Địa chính
         import json
@@ -444,6 +443,13 @@ if app_mode == "👤 Cập nhật thông tin":
             current_data = df.loc[idx]
         except KeyError:
             st.error("Phiên làm việc hết hạn."); st.stop()
+
+        note_content = str(current_data.get('Ghi chú', '')).strip()
+        if note_content:
+            st.error(f"⚠️ Ghi chú từ Chi ủy: {note_content}", icon="📢")
+        # ==================================================
+
+        st.subheader("Bước 3: Cập nhật thông tin chi tiết")
 
         st.write("Kiểm tra và chỉnh sửa các thông tin dưới đây:")
         
@@ -602,6 +608,10 @@ if app_mode == "👤 Cập nhật thông tin":
         # --- NÚT LƯU VÀ VALIDATION (NÂNG CẤP CHECK RIÊNG LẺ) ---
         if st.button("💾 LƯU THÔNG TIN", type="primary", use_container_width=True):
             
+            updated_values['Ghi chú'] = current_data.get('Ghi chú', '')
+            col_xoa = 'Đề nghị xóa (do đang viên không thuộc chi bộ)/ (Nếu muốn xóa chọn "có", còn không bỏ qua)'
+            updated_values[col_xoa] = current_data.get(col_xoa, "")
+
             missing_fields = []
 
             # 1. CHECK KHAI SINH (Kiểm tra kỹ từng thành phần)
