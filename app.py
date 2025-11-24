@@ -651,9 +651,27 @@ if app_mode == "👤 Cập nhật thông tin":
                     opts = ["Nam", "Nữ"]
                     idx = opts.index(val) if val in opts else 0
                     updated_values[col] = st.selectbox(clean_label, opts, index=idx, key=col)
+                # --- ĐOẠN CODE MỚI ---
                 else:
                     ph = "Để trống nếu chưa có thông tin" if col in OPTIONAL_COLS else ""
                     updated_values[col] = st.text_input(clean_label, value=str(val), placeholder=ph, key=col)
+
+                    # --- THÊM HỘP THÔNG BÁO TẠI ĐÂY ---
+                    if col == 'Số định danh cá nhân *':
+                        help_text_party_card = """
+                        <div style="
+                            background-color: #FFFBE6; 
+                            border-left: 5px solid #FFC107; 
+                            padding: 10px; 
+                            border-radius: 5px; 
+                            margin-top: 10px;
+                            margin-bottom: 10px;
+                            color: #333333;
+                        ">
+                            ❗ <strong>CHÚ Ý:</strong> NẾU ĐÃ CÓ THẺ ĐẢNG THÌ ĐIỀN ĐẦY ĐỦ CÁC MỤC THẺ ĐẢNG !!
+                        </div>
+                        """
+                        st.markdown(help_text_party_card, unsafe_allow_html=True)
 
         st.write("---")
         
@@ -881,6 +899,7 @@ elif app_mode == "📊 Admin Dashboard":
         st.error("Sai mật khẩu!")
     else:
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
