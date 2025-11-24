@@ -620,7 +620,7 @@ if app_mode == "👤 Cập nhật thông tin":
                         margin-top: 5px;
                         color: #333333; /* <-- THÊM DÒNG NÀY */
                     ">
-                        💡 <strong>KHÔNG PHẢI ĐỊA CHỈ TẠM CHÚ Ở HÀ NỘI. XEM THƯỜNG TRÚ TRÊN VNEID.</strong><br>
+                        💡 <strong>KHÔNG PHẢI ĐỊA CHỈ TẠM CHÚ Ở HÀ NỘI. XEM THƯỜNG TRÚ TRÊN VNEID. KHÔNG GHI XÃ/ PHƯỜNG VÀO DÂY!!!</strong><br>
                         <em>Cách ghi:</em> ghi chi tiết nhất có thể, bao gồm: số nhà, đường phố/thôn/xóm/tổ... (ví dụ Thôn Hòa Bình Hạ/ Tổ dân số 5/ Số 60 Ngách 6/12 Đội Nhân)
                     </div>
                     """
@@ -881,6 +881,7 @@ elif app_mode == "📊 Admin Dashboard":
         st.error("Sai mật khẩu!")
     else:
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
