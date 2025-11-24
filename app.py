@@ -264,20 +264,28 @@ def save_update_optimized(sheet, row_index, updated_values, workbook):
         
         # ========================================================
         # 🔥 4. CẬP NHẬT NÓNG VÀO SESSION (QUAN TRỌNG)
-        # Thay vì xóa session, ta sửa trực tiếp dữ liệu trong bộ nhớ
-        # để User A thấy kết quả ngay lập tức mà không cần chờ Cache
+        # FIX: Tạo DataFrame mới thay vì sửa in-place để tránh trùng lặp
         # ========================================================
         if 'df_main' in st.session_state:
-            # Lặp qua từng cột để cập nhật giá trị mới vào DataFrame
+            # Tạo bản sao sâu của DataFrame để tránh tham chiếu cũ
+            df_updated = st.session_state.df_main.copy()
+            
+            # Cập nhật dòng cần sửa
             for col in ALL_COLUMNS:
-                # Lấy giá trị trần (không có dấu ' ) để hiển thị trên Web cho đẹp
                 raw_val = updated_values.get(col, "")
-                st.session_state.df_main.at[row_index, col] = raw_val
+                df_updated.at[row_index, col] = raw_val
             
-            # Đặt lại thời gian tải để Session này không bị coi là hết hạn ngay
+            # Loại bỏ các dòng trùng lặp dựa trên ID (giữ bản mới nhất)
+            df_updated = df_updated.drop_duplicates(subset=['ID'], keep='last')
+            
+            # Reset index để tránh lỗi index không liên tục
+            df_updated = df_updated.reset_index(drop=True)
+            
+            # Thay thế hoàn toàn DataFrame cũ
+            st.session_state.df_main = df_updated
+            
+            # Đặt lại thời gian tải
             st.session_state.last_load_time = time.time()
-            
-            # Đảm bảo cờ data_loaded vẫn còn
             st.session_state.data_loaded = True
 
         return True
@@ -879,6 +887,7 @@ elif app_mode == "📊 Admin Dashboard":
         st.error("Sai mật khẩu!")
     else:
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
