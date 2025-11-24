@@ -746,7 +746,7 @@ if app_mode == "👤 Cập nhật thông tin":
         st.markdown("""
         <div style="padding: 20px; border: 1px solid #4CAF50; border-radius: 10px; background-color: #E8F5E9; color: #2E7D32;">
             <h3 style="margin:0">Dữ liệu đã được lưu an toàn.</h3>
-            <p>Cảm ơn đồng chí đã cập nhật thông tin.</p>
+            <p>Cảm ơn đồng chí đã cập nhật thông tin. CHÚ Ý: dữ liệu sẽ tự cập nhật thông tin vừa lưu sau ít phút, đồng chí không cần kiểm tra lại ngay!</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -899,6 +899,7 @@ elif app_mode == "📊 Admin Dashboard":
         st.error("Sai mật khẩu!")
     else:
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
