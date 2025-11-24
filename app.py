@@ -111,12 +111,8 @@ def retry_on_rate_limit(max_retries=5, initial_wait=2):
         return wrapper
     return decorator
 
-# --- CÁC HÀM WRAPPER AN TOÀN ---
-@retry_on_rate_limit()
-def safe_find_cell(sheet, value, in_column):
-    """Tìm ô chứa giá trị cụ thể trong cột (có retry)"""
-    return sheet.find(value, in_column=in_column)
-    
+# --- CÁC HÀM WRAPPER AN TOÀN (CẬP NHẬT ĐẦY ĐỦ) ---
+
 @retry_on_rate_limit()
 def safe_get_all_records(sheet, expected_headers):
     return sheet.get_all_records(expected_headers=expected_headers)
@@ -128,6 +124,16 @@ def safe_update_sheet(sheet, cell_range, values):
 @retry_on_rate_limit()
 def safe_append_row(sheet, row_data):
     return sheet.append_row(row_data, value_input_option='USER_ENTERED')
+
+# --- ĐÂY LÀ HÀM BẠN ĐANG THIẾU ---
+@retry_on_rate_limit()
+def safe_get_all_values(sheet):
+    return sheet.get_all_values()
+# ---------------------------------
+
+@retry_on_rate_limit()
+def safe_find_cell(sheet, value, in_column):
+    return sheet.find(value, in_column=in_column)
 
 # ========================================
 # ✅ CACHING & STATE MANAGEMENT (1 PHÚT)
@@ -873,6 +879,7 @@ elif app_mode == "📊 Admin Dashboard":
         st.error("Sai mật khẩu!")
     else:
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
