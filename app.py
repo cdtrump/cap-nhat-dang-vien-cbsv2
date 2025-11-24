@@ -226,18 +226,12 @@ def save_update_optimized(sheet, row_index, updated_values, workbook):
     try:
         # 1. Xử lý format Text cho Google Sheet (thêm dấu ' )
         cols_force_text = [
-            'ID',
-            'Số định danh cá nhân *', 
-            'Số thẻ Đảng* (12 số theo HD38-HD/BTCTW)',
-            'Số thẻ theo Đảng quyết định 85',
-            'Số CMND cũ (nếu có)',
-            'Sinh ngày * (dd/mm/yyyy)',
-            'Ngày cấp thẻ Đảng (dd/mm/yyyy)',
-            'Ngày vào Đảng* (dd/mm/yyyy)', 
+            'ID', 'Số định danh cá nhân *', 'Số thẻ Đảng* (12 số theo HD38-HD/BTCTW)',
+            'Số thẻ theo Đảng quyết định 85', 'Số CMND cũ (nếu có)', 'Sinh ngày * (dd/mm/yyyy)',
+            'Ngày cấp thẻ Đảng (dd/mm/yyyy)', 'Ngày vào Đảng* (dd/mm/yyyy)', 
             'Ngày vào Đảng chính thức* (dd/mm/yyyy)',
             'Ngày rời khỏi/ Ngày mất/ Ngày miễn sinh hoạt Đảng (dd/mm/yyyy)'
         ]
-
         row_vals = []
         for col in ALL_COLUMNS:
             val = updated_values.get(col, "")
@@ -262,31 +256,18 @@ def save_update_optimized(sheet, row_index, updated_values, workbook):
             st.error(f"❌ Không tìm thấy ID {target_id} trong file gốc!")
             return False
         
-        # ========================================================
-        # 🔥 4. CẬP NHẬT NÓNG VÀO SESSION (QUAN TRỌNG)
-        # FIX: Tạo DataFrame mới thay vì sửa in-place để tránh trùng lặp
-        # ========================================================
-        if 'df_main' in st.session_state:
-            # Tạo bản sao sâu của DataFrame để tránh tham chiếu cũ
-            df_updated = st.session_state.df_main.copy()
-            
-            # Cập nhật dòng cần sửa
-            for col in ALL_COLUMNS:
-                raw_val = updated_values.get(col, "")
-                df_updated.at[row_index, col] = raw_val
-            
-            # Loại bỏ các dòng trùng lặp dựa trên ID (giữ bản mới nhất)
-            df_updated = df_updated.drop_duplicates(subset=['ID'], keep='last')
-            
-            # Reset index để tránh lỗi index không liên tục
-            df_updated = df_updated.reset_index(drop=True)
-            
-            # Thay thế hoàn toàn DataFrame cũ
-            st.session_state.df_main = df_updated
-            
-            # Đặt lại thời gian tải
-            st.session_state.last_load_time = time.time()
-            st.session_state.data_loaded = True
+        # ====================================================================
+        # 🔥 4. XÓA SẠCH CACHE ĐỂ TẢI LẠI DỮ LIỆU MỚI NHẤT
+        # Đây là cách đảm bảo tính nhất quán tuyệt đối sau khi lưu.
+        # ====================================================================
+        
+        # Xóa Cache toàn cục ("Kho chung")
+        st.cache_data.clear()
+        
+        # Xóa Session của người dùng hiện tại ("Bàn làm việc riêng")
+        for key in ['data_loaded', 'df_main', 'main_sheet', 'workbook', 'last_load_time']:
+            if key in st.session_state:
+                del st.session_state[key]
 
         return True
 
@@ -887,6 +868,7 @@ elif app_mode == "📊 Admin Dashboard":
         st.error("Sai mật khẩu!")
     else:
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
