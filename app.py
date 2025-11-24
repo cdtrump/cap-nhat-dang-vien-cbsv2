@@ -218,7 +218,7 @@ def find_province_index(province_from_sheet, all_provinces_list):
     
 def save_update_optimized(sheet, row_index, updated_values, workbook):
     try:
-        # 1. Xử lý format Text (như đã làm trước đó)
+        # 1. Xử lý format Text cho Google Sheet (thêm dấu ' )
         cols_force_text = [
             'ID',
             'Số định danh cá nhân *', 
@@ -239,31 +239,41 @@ def save_update_optimized(sheet, row_index, updated_values, workbook):
                 val = "'" + str(val)
             row_vals.append(val)
         
-        # 2. Backup (An toàn)
+        # 2. Backup (An toàn - Giờ VN)
         try:
             backup_sheet = workbook.worksheet(SHEET_NAME_BACKUP)
             vn_time = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
             safe_append_row(backup_sheet, [vn_time] + row_vals)
         except: pass
         
-        # 3. UPDATE CHÍNH XÁC DỰA TRÊN TÌM KIẾM ID (THAY ĐỔI QUAN TRỌNG)
+        # 3. GHI LÊN GOOGLE SHEET (Dùng tìm kiếm ID an toàn)
         target_id = str(updated_values.get('ID', '')).strip()
-        
-        # Tìm lại vị trí dòng dựa trên ID (Cột 2 là cột ID)
         found_cell = safe_find_cell(sheet, target_id, in_column=2)
         
         if found_cell:
-            # Nếu tìm thấy, cập nhật đúng dòng đó
             safe_update_sheet(sheet, f"A{found_cell.row}", [row_vals])
         else:
-            # Trường hợp xấu: ID bị ai đó xóa mất trong lúc đang thao tác
-            st.error(f"❌ Không tìm thấy ID {target_id} trong file gốc! Có thể dữ liệu đã bị thay đổi.")
+            st.error(f"❌ Không tìm thấy ID {target_id} trong file gốc!")
             return False
         
-        # 4. Dọn dẹp session
-        for key in ['data_loaded', 'df_main', 'main_sheet', 'workbook']:
-            if key in st.session_state:
-                del st.session_state[key]
+        # ========================================================
+        # 🔥 4. CẬP NHẬT NÓNG VÀO SESSION (QUAN TRỌNG)
+        # Thay vì xóa session, ta sửa trực tiếp dữ liệu trong bộ nhớ
+        # để User A thấy kết quả ngay lập tức mà không cần chờ Cache
+        # ========================================================
+        if 'df_main' in st.session_state:
+            # Lặp qua từng cột để cập nhật giá trị mới vào DataFrame
+            for col in ALL_COLUMNS:
+                # Lấy giá trị trần (không có dấu ' ) để hiển thị trên Web cho đẹp
+                raw_val = updated_values.get(col, "")
+                st.session_state.df_main.at[row_index, col] = raw_val
+            
+            # Đặt lại thời gian tải để Session này không bị coi là hết hạn ngay
+            st.session_state.last_load_time = time.time()
+            
+            # Đảm bảo cờ data_loaded vẫn còn
+            st.session_state.data_loaded = True
+
         return True
 
     except Exception as e:
@@ -863,6 +873,7 @@ elif app_mode == "📊 Admin Dashboard":
         st.error("Sai mật khẩu!")
     else:
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
