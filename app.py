@@ -611,7 +611,7 @@ if app_mode == "👤 Cập nhật thông tin":
                     tt_xa = st.selectbox("Xã/Phường/ Đặc khu *", list_xa, index=idx, key="tt_xa")
                 with c2:
                     tt_thon = st.text_input("Địa chỉ chi tiết dưới Xã/Phường/ Đặc khu *", value=str(val_thon), key="tt_thon")
-                    st.caption("💡 Cách ghi: ghi chi tiết nhất có thể, bao gồm: số nhà, đường phố/thôn/xóm/tổ... (ví dụ Thôn Hòa Bình Hạ/ Tổ dân số 5/ Số 60 Ngách 6/12 Đội Nhân)")
+                    st.caption("💡 KHÔNG PHẢI ĐỊA CHỈ TẠM CHÚ Ở HÀ NỘI. XEM THƯỜNG TRÚ TRÊN VNEID. Cách ghi: ghi chi tiết nhất có thể, bao gồm: số nhà, đường phố/thôn/xóm/tổ... (ví dụ Thôn Hòa Bình Hạ/ Tổ dân số 5/ Số 60 Ngách 6/12 Đội Nhân)")
 
                 updated_values['Temp_XaPhuong_ThuongTru'] = tt_xa
                 updated_values['Temp_ThonTo_ThuongTru'] = tt_thon
@@ -868,3 +868,4 @@ elif app_mode == "📊 Admin Dashboard":
         st.error("Sai mật khẩu!")
     else:
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
