@@ -218,52 +218,57 @@ def find_province_index(province_from_sheet, all_provinces_list):
     
 def save_update_optimized(sheet, row_index, updated_values, workbook):
     try:
+        # 1. Xử lý format Text (như đã làm trước đó)
         cols_force_text = [
-            # 1. Các cột SỐ (Cần giữ số 0 ở đầu)
             'ID',
             'Số định danh cá nhân *', 
             'Số thẻ Đảng* (12 số theo HD38-HD/BTCTW)',
             'Số thẻ theo Đảng quyết định 85',
             'Số CMND cũ (nếu có)',
-            
-            # 2. Các cột NGÀY THÁNG (Cần giữ định dạng dd/mm/yyyy)
             'Sinh ngày * (dd/mm/yyyy)',
             'Ngày cấp thẻ Đảng (dd/mm/yyyy)',
             'Ngày vào Đảng* (dd/mm/yyyy)', 
-            'Ngày vào Đảng chính thức* (dd/mm/yyyy)'
+            'Ngày vào Đảng chính thức* (dd/mm/yyyy)',
+            'Ngày rời khỏi/ Ngày mất/ Ngày miễn sinh hoạt Đảng (dd/mm/yyyy)'
         ]
 
         row_vals = []
         for col in ALL_COLUMNS:
             val = updated_values.get(col, "")
-            
-            # Logic: Nếu cột nằm trong danh sách TRÊN và có dữ liệu
             if col in cols_force_text and val:
-                # Thêm dấu nháy đơn vào trước để ép kiểu Text
                 val = "'" + str(val)
-            
             row_vals.append(val)
         
-        # 1. Backup (An toàn - Giờ VN)
+        # 2. Backup (An toàn)
         try:
             backup_sheet = workbook.worksheet(SHEET_NAME_BACKUP)
-            # Lấy giờ VN (UTC + 7)
             vn_time = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
             safe_append_row(backup_sheet, [vn_time] + row_vals)
         except: pass
         
-        # 2. Update (Dùng wrapper an toàn, row_index + 2 vì header + 1-based index)
-        safe_update_sheet(sheet, f"A{row_index + 2}", [row_vals])
+        # 3. UPDATE CHÍNH XÁC DỰA TRÊN TÌM KIẾM ID (THAY ĐỔI QUAN TRỌNG)
+        target_id = str(updated_values.get('ID', '')).strip()
         
-        # 3. Dọn dẹp session (Chỉ xóa của user này để họ thấy data mới)
+        # Tìm lại vị trí dòng dựa trên ID (Cột 2 là cột ID)
+        found_cell = safe_find_cell(sheet, target_id, in_column=2)
+        
+        if found_cell:
+            # Nếu tìm thấy, cập nhật đúng dòng đó
+            safe_update_sheet(sheet, f"A{found_cell.row}", [row_vals])
+        else:
+            # Trường hợp xấu: ID bị ai đó xóa mất trong lúc đang thao tác
+            st.error(f"❌ Không tìm thấy ID {target_id} trong file gốc! Có thể dữ liệu đã bị thay đổi.")
+            return False
+        
+        # 4. Dọn dẹp session
         for key in ['data_loaded', 'df_main', 'main_sheet', 'workbook']:
             if key in st.session_state:
                 del st.session_state[key]
         return True
+
     except Exception as e:
         st.error(f"❌ Lỗi lưu dữ liệu: {str(e)}")
         return False
-
 
 # --- GIAO DIỆN CHÍNH ---
 st.set_page_config(page_title="Cập nhật thông tin Đảng viên CBSV II -NEU", layout="wide")
@@ -858,5 +863,6 @@ elif app_mode == "📊 Admin Dashboard":
         st.error("Sai mật khẩu!")
     else:
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
