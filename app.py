@@ -218,11 +218,36 @@ def find_province_index(province_from_sheet, all_provinces_list):
     
 def save_update_optimized(sheet, row_index, updated_values, workbook):
     try:
-        row_vals = [updated_values.get(c, "") for c in ALL_COLUMNS]
+        cols_force_text = [
+            # 1. Các cột SỐ (Cần giữ số 0 ở đầu)
+            'ID',
+            'Số định danh cá nhân *', 
+            'Số thẻ Đảng* (12 số theo HD38-HD/BTCTW)',
+            'Số thẻ theo Đảng quyết định 85',
+            'Số CMND cũ (nếu có)',
+            
+            # 2. Các cột NGÀY THÁNG (Cần giữ định dạng dd/mm/yyyy)
+            'Sinh ngày * (dd/mm/yyyy)',
+            'Ngày cấp thẻ Đảng (dd/mm/yyyy)',
+            'Ngày vào Đảng* (dd/mm/yyyy)', 
+            'Ngày vào Đảng chính thức* (dd/mm/yyyy)'
+        ]
+
+        row_vals = []
+        for col in ALL_COLUMNS:
+            val = updated_values.get(col, "")
+            
+            # Logic: Nếu cột nằm trong danh sách TRÊN và có dữ liệu
+            if col in cols_force_text and val:
+                # Thêm dấu nháy đơn vào trước để ép kiểu Text
+                val = "'" + str(val)
+            
+            row_vals.append(val)
         
-        # 1. Backup (An toàn)
+        # 1. Backup (An toàn - Giờ VN)
         try:
             backup_sheet = workbook.worksheet(SHEET_NAME_BACKUP)
+            # Lấy giờ VN (UTC + 7)
             vn_time = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
             safe_append_row(backup_sheet, [vn_time] + row_vals)
         except: pass
@@ -833,4 +858,5 @@ elif app_mode == "📊 Admin Dashboard":
         st.error("Sai mật khẩu!")
     else:
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
