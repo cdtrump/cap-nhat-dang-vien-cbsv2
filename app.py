@@ -146,7 +146,7 @@ def load_data_main_cached(_sheet):
     df = pd.DataFrame(data)
     
     # Xử lý số 0 ở đầu (Logic cũ nhưng đưa vào cache)
-    cols_need_zero = ['Số định danh cá nhân *', 'Số thẻ Đảng* (12 số theo HD38-HD/BTCTW)', 'Số CMND cũ (nếu có)']
+    cols_need_zero = ['Số định danh cá nhân *', 'Số thẻ Đảng* (12 số theo HD38-HD/BTCTW)']
     for col in cols_need_zero:
         if col in df.columns:
             df[col] = df[col].astype(str).replace(r'\.0$', '', regex=True).replace(['nan', 'None', ''], '')
@@ -899,6 +899,7 @@ elif app_mode == "📊 Admin Dashboard":
         st.error("Sai mật khẩu!")
     else:
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
