@@ -78,7 +78,9 @@ def connect_to_workbook():
         key_dict = json.loads(st.secrets["textkey"])
         creds = ServiceAccountCredentials.from_json_keyfile_dict(key_dict, scope)
     client = gspread.authorize(creds)
-    return client.open("DanhSachDangVien")
+    # Thay thế chuỗi bên dưới bằng ID thực tế từ link file Sheet của bạn
+    SPREADSHEET_ID = "1buJtsYVcDa0ZEZhaQiXChxj9TrlPgFk2TNSGmR6Z5bk" 
+    return client.open_by_key(SPREADSHEET_ID)
 
 # ========================================
 # 🔥 GIẢI PHÁP AUTO-RETRY KHI GẶP LỖI 429
@@ -899,6 +901,7 @@ elif app_mode == "📊 Admin Dashboard":
         st.error("Sai mật khẩu!")
     else:
         st.info("Vui lòng nhập mật khẩu để xem thống kê.")
+
 
 
 
